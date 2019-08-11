@@ -1,0 +1,1 @@
+aws s3 cp img/ s3://static.time-locker.jabara.info/img/ --recursive --exclude "*" --include "*.png"
