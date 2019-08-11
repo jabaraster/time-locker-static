@@ -1,0 +1,24 @@
+th {
+  word-break: break-all;
+}
+th.number,
+td.number {
+  text-align: right;
+}
+div.character-image-container img {
+  display: block;
+  width: 65px;
+  height: 65px;
+}
+div.character-image-container span {
+  display: inline-block;
+  padding: 2px;
+  border: solid 1px #ff5000;
+  min-width: 150px;
+  color: #ff5000;
+  font-weight: bold;
+  font-size: 80%;
+}
+.table > tbody > tr > td {
+  vertical-align: bottom;
+}
