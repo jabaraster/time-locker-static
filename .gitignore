@@ -1,1 +1,4 @@
-css/
+css/*.css
+js/*.js
+.work/
+elm-stuff/
