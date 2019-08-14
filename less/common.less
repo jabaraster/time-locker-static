@@ -3,10 +3,17 @@
 th {
     word-break: break-all;
 }
+h1 {
+    color: @theme-color;
+}
 th.number, td.number {
     text-align: right;
 }
-div.character-image-container {
+div.character-image-container-floating {
+    margin: 1px;
+    display: inline-block;
+}
+div.character-image-container, div.character-image-container-floating {
     img {
         display: block;
         width: 65px;
@@ -24,4 +31,44 @@ div.character-image-container {
 }
 .table > tbody > tr > td {
     vertical-align: bottom;
+}
+
+.loading-icon {
+    display: block;
+    position: fixed;
+    font-size: 300%;
+    color: @theme-color;
+    margin: 10px;
+    padding: 4px;
+    background-color: rgba(255,255,255,.6);
+    border-radius: 50%;
+    right: 0;
+}
+/* https://on-ze.com/archives/510 より */
+.loading {
+  -webkit-animation: spin 1s linear infinite;
+  -moz-animation: spin 1s linear infinite;
+  -ms-animation: spin 1s linear infinite;
+  -o-animation: spin 1s linear infinite;
+  animation: spin 1s linear infinite;
+}
+@-webkit-keyframes spin {
+	0% {-webkit-transform: rotate(0deg);}
+	100% {-webkit-transform: rotate(360deg);}
+}
+@-moz-keyframes spin {
+	0% {-moz-transform: rotate(0deg);}
+	100% {-moz-transform: rotate(360deg);}
+}
+@-ms-keyframes spin {
+	0% {-ms-transform: rotate(0deg);}
+	100% {-ms-transform: rotate(360deg);}
+}
+@-o-keyframes spin {
+	0% {-o-transform: rotate(0deg);}
+	100% {-o-transform: rotate(360deg);}
+}
+@keyframes spin {
+	0% {transform: rotate(0deg);}
+	100% {transform: rotate(360deg);}
 }
