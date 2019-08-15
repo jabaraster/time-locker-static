@@ -8,6 +8,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode
+import List.Split as LS
 import RemoteResource exposing (..)
 import Task
 import Time
@@ -276,15 +277,15 @@ tagHighScore : Maybe Types.ScoreData -> List (Html.Html msg)
 tagHighScore mScore =
     [ tr [ class "score-element" ]
         [ th [] [ text "Play count" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> String.fromInt score.playCount) mScore ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatInt score.playCount) mScore ]
         ]
     , tr [ class "score-element" ]
         [ th [] [ text "High score" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> String.fromInt score.highScore) mScore ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatInt score.highScore) mScore ]
         ]
     , tr [ class "score-element" ]
         [ th [] [ text "Average score" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> String.fromInt <| round score.averageScore) mScore ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatInt <| round score.averageScore) mScore ]
         ]
     ]
 
@@ -292,3 +293,8 @@ tagHighScore mScore =
 characterImageUrl : CharacterName -> Int -> Int -> String
 characterImageUrl characterName width height =
     "https://static.time-locker.jabara.info/img/" ++ characterName ++ "@" ++ String.fromInt width ++ "x" ++ String.fromInt height ++ ".png"
+
+
+formatInt : Int -> String
+formatInt i =
+    String.join "," <| List.reverse <| List.map String.fromList <| LS.chunksOfRight 3 <| String.toList <| String.fromInt i
