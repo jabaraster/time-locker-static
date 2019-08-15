@@ -8,6 +8,9 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode
+import RemoteResource exposing (..)
+import Task
+import Time
 import Types
 import Url
 import Url.Parser exposing (..)
@@ -35,15 +38,10 @@ type Page
     | CharacterSummaryPage CharacterName
 
 
-type alias RemoteResource a =
-    Maybe (Result Http.Error a)
-
-
 type alias Model =
     { key : Nav.Key
     , page : Page
     , characters : RemoteResource (List Types.Character)
-    , charactersLoading : Bool
     }
 
 
@@ -53,6 +51,7 @@ type Msg
     | UrlChanged Url.Url
     | CharacterListLoaded (Result Http.Error (List Types.Character))
     | LoadCharacterList
+    | GetCharacterListLoadedTime Time.Posix
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -64,21 +63,22 @@ init _ url key =
         model =
             { key = key
             , page = page
-            , characters = Nothing
-            , charactersLoading = False
+            , characters = emptyRemoteResource
             }
     in
     case page of
         HomePage ->
-            ( { model | charactersLoading = True }
+            ( { model | characters = startLoading model.characters }
             , Api.getCharacterList CharacterListLoaded
             )
 
         NotFoundPage ->
             ( model, Cmd.none )
 
-        CharacterSummaryPage _ ->
-            ( model, Cmd.none )
+        CharacterSummaryPage name ->
+            ( { model | page = CharacterSummaryPage <| Maybe.withDefault name <| Url.percentDecode name }
+            , Cmd.none
+            )
 
 
 parseUrl : Url.Url -> Page
@@ -117,9 +117,13 @@ update msg model =
             in
             case page of
                 HomePage ->
-                    case model.characters of
+                    case model.characters.data of
                         Nothing ->
-                            ( { newModel | charactersLoading = True }
+                            let
+                                cs =
+                                    model.characters
+                            in
+                            ( { newModel | characters = { cs | loading = True } }
                             , Api.getCharacterList CharacterListLoaded
                             )
 
@@ -130,13 +134,22 @@ update msg model =
                     ( newModel, Cmd.none )
 
                 CharacterSummaryPage name ->
-                    ( newModel, Cmd.none )
+                    ( { newModel | page = CharacterSummaryPage <| Maybe.withDefault name <| Url.percentDecode name }
+                    , Cmd.none
+                    )
 
         CharacterListLoaded res ->
-            ( { model | charactersLoading = False, characters = Just res }, Cmd.none )
+            ( { model | characters = updateData model.characters res }
+            , Task.perform GetCharacterListLoadedTime Time.now
+            )
 
         LoadCharacterList ->
-            ( { model | charactersLoading = True }, Api.getCharacterList CharacterListLoaded )
+            ( { model | characters = startLoading model.characters }
+            , Api.getCharacterList CharacterListLoaded
+            )
+
+        GetCharacterListLoadedTime now ->
+            ( { model | characters = updateLastLoadedTime model.characters now }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -146,7 +159,7 @@ subscriptions _ =
 
 isLoading : Model -> Bool
 isLoading model =
-    model.charactersLoading
+    model.characters.loading
 
 
 view : Model -> Document Msg
@@ -179,8 +192,11 @@ viewCharacterSummary : String -> Model -> Document Msg
 viewCharacterSummary characterName _ =
     { title = characterName ++ " Summary"
     , body =
-        [ img [ src <| characterImageUrl characterName 660 460 ] []
-        , a [ href "/" ] [ text "Dashboard" ]
+        [ div [ class "container character-summary" ]
+            [ header [] [ a [ href "/" ] [ text "< Back to Dashboard" ] ]
+            , img [ src <| characterImageUrl characterName 660 460, class "character" ] []
+            , h3 [] [ span [ class "character-name" ] [ text <| characterName ] ]
+            ]
         ]
     }
 
@@ -199,9 +215,11 @@ viewHome model =
             "Dashboard"
 
         tags =
-            case model.characters of
+            case model.characters.data of
                 Nothing ->
-                    [ span [] [ text "Character list is loading now." ] ]
+                    [ span [] [ text "Character list is loading now." ]
+                    , span [ class "fas fa-sync loading" ] []
+                    ]
 
                 Just (Ok cs) ->
                     div []
@@ -209,7 +227,7 @@ viewHome model =
                             [ class "btn btn-default"
                             , onClick LoadCharacterList
                             ]
-                            [ i [ class "fas fa-sync" ] [] ]
+                            [ i [ classList [ ( "fas fa-sync", True ), ( "loading", model.characters.loading ) ] ] [] ]
                         ]
                         :: List.map
                             (\character ->

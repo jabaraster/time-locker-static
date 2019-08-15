@@ -1,17 +1,61 @@
 @theme-color: rgba(255,80,0,1);
 
+/************************
+ * Dashboard
+ ************************/
+div.character-image-container-floating {
+    margin: 1px;
+    margin-bottom: 10px;
+    display: inline-block;
+}
+
+/************************
+ * Character summary page
+ ************************/
+@media (min-height: 801px) {
+    .character-summary {
+       img.character {
+           width: 350px;
+           height: 373px;
+           object-fit: none;
+           object-position: 0 0;
+       }
+    }
+}
+ @media (max-height: 800px) {
+    .character-summary {
+       img.character {
+           width: 250px;
+           height: 135px;
+           object-fit: cover;
+           object-position: 0 0;
+       }
+    }
+ }
+
+/************************
+ * General
+ ************************/
 th {
     word-break: break-all;
 }
-h1 {
+h1, h3 {
     color: @theme-color;
+    font-weight: bold;
+    font-style: italic;
 }
 th.number, td.number {
     text-align: right;
 }
-div.character-image-container-floating {
-    margin: 1px;
-    display: inline-block;
+.character-name {
+    color: @theme-color;
+    font-weight: bold;
+    font-style: italic;
+    padding-left: .5rem;
+    padding-right: 1rem;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    border: solid 1px @theme-color;
 }
 div.character-image-container, div.character-image-container-floating {
     img {
@@ -21,18 +65,14 @@ div.character-image-container, div.character-image-container-floating {
     }
     span {
         display: inline-block;
-        padding: 2px;
-        border: solid 1px @theme-color;
         min-width: 150px;
-        color: @theme-color;
-        font-weight: bold;
         font-size: 80%;
     }
 }
 .table > tbody > tr > td {
     vertical-align: bottom;
 }
-
+/* Loading */
 .loading-icon {
     display: block;
     position: fixed;

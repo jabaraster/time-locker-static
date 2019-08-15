@@ -2,6 +2,7 @@
 elm-format elm/Index.elm --output elm/Index.elm --yes \
   && elm-format elm/Api.elm --output elm/Api.elm --yes \
   && elm-format elm/Types.elm --output elm/Types.elm --yes \
+  && elm-format elm/RemoteResource.elm --output elm/RemoteResource.elm --yes \
   && elm make elm/Index.elm --output=./.work/index.js \
   && uglifyjs .work/index.js --compress 'pure_funcs="Elm.Index.init,F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9",pure_getters,keep_fargs=false,unsafe_comps,unsafe' \
   | uglifyjs --mangle --output=./js/index.min.js \
