@@ -1,4 +1,4 @@
-module RemoteResource exposing (..)
+module RemoteResource exposing (RemoteResource, emptyRemoteResource, finishLoading, resourceValue, startLoading, updateData, updateLastLoadedTime)
 
 import Http
 import Time
@@ -13,6 +13,19 @@ type alias RemoteResource a =
 
 emptyRemoteResource =
     { data = Nothing, loading = False, lastLoadedTime = Nothing }
+
+
+resourceValue : RemoteResource a -> b -> (a -> b) -> b
+resourceValue rr defaultValue operation =
+    case rr.data of
+        Nothing ->
+            defaultValue
+
+        Just (Err _) ->
+            defaultValue
+
+        Just (Ok val) ->
+            operation val
 
 
 updateData : RemoteResource a -> Result Http.Error a -> RemoteResource a

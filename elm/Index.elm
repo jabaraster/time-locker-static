@@ -235,6 +235,7 @@ viewHome model =
                                     [ div [ class "character-image-container-floating" ]
                                         [ img [ src <| characterImageUrl character.name 65 65, alt character.name, class "character" ] []
                                         , span [ class "character-name" ] [ text character.name ]
+                                        , tagScore character
                                         ]
                                     ]
                             )
@@ -250,7 +251,7 @@ viewHome model =
             , ul
                 []
                 [ li [] [ a [ href "/score/character-average", target "time-locker-analyzer-table" ] [ text "Character average score" ] ]
-                , li [] [ a [ href "/score/character-high", target "time-locker-analyzer-table" ] [ text "Character highscore" ] ]
+                , li [] [ a [ href "/score/character-high", target "time-locker-analyzer-table" ] [ text "Character high score" ] ]
                 , li [] [ a [ href "/arms/score-per-level", target "time-locker-analyzer-table" ] [ text "Score per armament level" ] ]
                 ]
             ]
@@ -258,6 +259,34 @@ viewHome model =
                 ++ tags
         ]
     }
+
+
+tagScore : Types.Character -> Html.Html msg
+tagScore c =
+    table [ class "character-list" ]
+        [ tbody [] <|
+            [ tr [] [ th [] [ text "Hard" ] ] ]
+                ++ tagHighScore c.hard
+                ++ [ tr [] [ th [] [ text "Normal" ] ] ]
+                ++ tagHighScore c.normal
+        ]
+
+
+tagHighScore : Maybe Types.ScoreData -> List (Html.Html msg)
+tagHighScore mScore =
+    [ tr [ class "score-element" ]
+        [ th [] [ text "Play count" ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> String.fromInt score.playCount) mScore ]
+        ]
+    , tr [ class "score-element" ]
+        [ th [] [ text "High score" ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> String.fromInt score.highScore) mScore ]
+        ]
+    , tr [ class "score-element" ]
+        [ th [] [ text "Average score" ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> String.fromInt <| round score.averageScore) mScore ]
+        ]
+    ]
 
 
 characterImageUrl : CharacterName -> Int -> Int -> String
