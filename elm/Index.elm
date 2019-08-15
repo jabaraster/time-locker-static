@@ -216,7 +216,7 @@ viewHome model =
                                 a [ href <| "/character/" ++ character.name ]
                                     [ div [ class "character-image-container-floating" ]
                                         [ img [ src <| characterImageUrl character.name 65 65, alt character.name, class "character" ] []
-                                        , span [] [ text character.name ]
+                                        , span [ class "character-name" ] [ text character.name ]
                                         ]
                                     ]
                             )
