@@ -1,8 +1,9 @@
-module Index exposing (CharacterName, Model, Msg(..), Page(..), characterImageUrl, init, main, parseUrl, subscriptions, update, view, viewCharacterSummary, viewHome, viewNotFound)
+module Index exposing (Model, Msg(..), Page(..), characterImageUrl, init, main, parseUrl, subscriptions, update, view, viewCharacterSummary, viewHome, viewNotFound)
 
 import Api
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Nav
+import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -12,7 +13,7 @@ import List.Split as LS
 import RemoteResource exposing (..)
 import Task
 import Time
-import Types
+import Types exposing (CharacterName)
 import Url
 import Url.Parser exposing (..)
 
@@ -29,10 +30,6 @@ main =
         }
 
 
-type alias CharacterName =
-    String
-
-
 type Page
     = HomePage
     | NotFoundPage
@@ -42,7 +39,7 @@ type Page
 type alias Model =
     { key : Nav.Key
     , page : Page
-    , characters : RemoteResource (List Types.Character)
+    , characters : RemoteResource Types.CharacterList
     }
 
 
@@ -50,7 +47,7 @@ type Msg
     = None
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | CharacterListLoaded (Result Http.Error (List Types.Character))
+    | CharacterListLoaded (Result Http.Error Types.CharacterList)
     | LoadCharacterList
     | GetCharacterListLoadedTime Time.Posix
 
@@ -189,7 +186,7 @@ view model =
     }
 
 
-viewCharacterSummary : String -> Model -> Document Msg
+viewCharacterSummary : Types.CharacterName -> Model -> Document Msg
 viewCharacterSummary characterName _ =
     { title = characterName ++ " Summary"
     , body =
@@ -232,10 +229,10 @@ viewHome model =
                         ]
                         :: List.map
                             (\character ->
-                                a [ href <| "/character/" ++ character.name ]
+                                a [ href <| "/character/" ++ character.character ]
                                     [ div [ class "character-image-container-floating" ]
-                                        [ img [ src <| characterImageUrl character.name 65 65, alt character.name, class "character" ] []
-                                        , span [ class "character-name" ] [ text character.name ]
+                                        [ img [ src <| characterImageUrl character.character 65 65, alt character.character, class "character" ] []
+                                        , span [ class "character-name" ] [ text character.character ]
                                         , tagScore character
                                         ]
                                     ]
@@ -262,7 +259,7 @@ viewHome model =
     }
 
 
-tagScore : Types.Character -> Html.Html msg
+tagScore : Types.CharacterListElement -> Html.Html msg
 tagScore c =
     table [ class "character-list" ]
         [ tbody [] <|
@@ -277,15 +274,15 @@ tagHighScore : Maybe Types.ScoreData -> List (Html.Html msg)
 tagHighScore mScore =
     [ tr [ class "score-element" ]
         [ th [] [ text "Play count" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatInt score.playCount) mScore ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma score.playCount) mScore ]
         ]
     , tr [ class "score-element" ]
         [ th [] [ text "High score" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatInt score.highScore) mScore ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma score.highScore) mScore ]
         ]
     , tr [ class "score-element" ]
         [ th [] [ text "Average score" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatInt <| round score.averageScore) mScore ]
+        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma <| round score.averageScore) mScore ]
         ]
     ]
 
@@ -295,6 +292,6 @@ characterImageUrl characterName width height =
     "https://static.time-locker.jabara.info/img/" ++ characterName ++ "@" ++ String.fromInt width ++ "x" ++ String.fromInt height ++ ".png"
 
 
-formatInt : Int -> String
-formatInt i =
-    String.join "," <| List.reverse <| List.map String.fromList <| LS.chunksOfRight 3 <| String.toList <| String.fromInt i
+formatComma : Int -> String
+formatComma =
+    String.join "," << List.reverse << List.map String.fromList << LS.chunksOfRight 3 << String.toList << String.fromInt
