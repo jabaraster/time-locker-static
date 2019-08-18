@@ -1,4 +1,6 @@
 @theme-color: rgba(255,80,0,1);
+@score-color: #337ab7;
+@score-border-color: rgba(180,180,255,.3);
 
 /************************
  * Dashboard
@@ -18,7 +20,7 @@ table.character-list {
         text-align: right;
     }
     tr.score-element {
-        border-bottom: solid 1px rgba(180,180,255,.3);
+        border-bottom: @score-border-color;
         th {
             padding-left: .5em;
         }
@@ -38,7 +40,7 @@ table.character-list {
        }
     }
 }
- @media (max-height: 800px) {
+@media (max-height: 800px) {
     .character-summary {
        img.character {
            width: 250px;
@@ -48,33 +50,71 @@ table.character-list {
        }
     }
  }
- .character-summary-container {
-     display: inline-block;
-     margin: .5em;
-     padding: .5em;
+table.score-summary-container {
+    width: 100%;
+    max-width: 480px;
+    tr {
+        border-bottom: solid 1px @score-border-color;
+    }
+    th, td {
+        padding-left: 1em;
+        padding-right: 1em;
+        padding-top: 5px;
+        padding-top: 5px;
+    }
+}
+.score-rank-container {
+    margin-bottom: 10px;
+    td {
+        padding-left: 1em;
+    }
+}
+img.armament {
+    width: 20px;
+    height: 20px;
+}
+.armament-container {
+    display: inline-block;
+    color: rgba(230,230,230,1);
+    background-color: rgba(30,30,30,1);
+    border-radius: 4px;
+    padding: 2px;
+    margin-right: 1px;
+    margin-bottom: 1px;
+}
+.armament-level {
+    font-weight: bold;
+    font-style: italic;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+.character-summary-container {
+    display: inline-block;
+    margin: .5em;
+    padding: .5em;
 
-     table tbody.summary tr {
-         border-bottom: solid 1px rgba(100,100,100,.6);
-     }
-     table.armament-level-list {
-         tbody tr.basic-play-result > * {
-             padding-top: .5em;
-         }
-     }
-     td.number, td.play-time {
-         padding-left: 1em;
-     }
-     td.armament-level-container {
-         > img {
-             margin-right: 3px;
-             width: 24px;
-             height: 24px;
-         }
-         > .armament-level {
-             padding-left: 1em;
-         }
-     }
- }
+    table tbody.summary tr {
+        border-bottom: solid 1px rgba(100,100,100,.6);
+    }
+    table.armament-level-list {
+        tbody tr.basic-play-result > * {
+            padding-top: .5em;
+        }
+    }
+    td.number, td.play-time {
+        padding-left: 1em;
+    }
+    td.armament-level-container {
+        > img {
+            margin-right: 3px;
+            width: 24px;
+            height: 24px;
+        }
+        > .armament-level {
+            padding-left: 1em;
+        }
+    }
+}
 
 /************************
  * General

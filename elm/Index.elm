@@ -253,7 +253,7 @@ viewCharacterSummaryCore : RemoteResource CharacterSummary -> List (Html Msg)
 viewCharacterSummaryCore rr =
     case rr.data of
         Nothing ->
-            [ span [] [ text "now loading..." ]
+            [ span [] [ text "Now loading..." ]
             , loadingIcon
             ]
 
@@ -261,71 +261,99 @@ viewCharacterSummaryCore rr =
             [ span [] [ text "Fail loading..." ] ]
 
         Just (Ok data) ->
-            viewCharacterSummaryElement "Hard" data.hard
-                ++ viewCharacterSummaryElement "Normal" data.normal
-
-
-viewCharacterSummaryElement : String -> Maybe CharacterSummaryElement -> List (Html Msg)
-viewCharacterSummaryElement mode mSummary =
-    case mSummary of
-        Nothing ->
-            [ h3 [] [ text mode ], text "-" ]
-
-        Just summary ->
-            [ div [ class "character-summary-container" ]
-                [ h1 [] [ text mode ]
-                , table []
-                    [ tbody [ class "summary" ]
-                        [ tr []
-                            [ th [] [ text "Play count" ]
-                            , td [ class "number" ] [ text <| formatComma summary.scoreSummary.playCount ]
-                            ]
-                        , tr []
-                            [ th [] [ text "High score" ]
-                            , td [ class "number" ] [ text <| formatComma summary.scoreSummary.highScore ]
-                            ]
-                        , tr []
-                            [ th [] [ text "Average score" ]
-                            , td [ class "number" ] [ text <| formatComma <| round summary.scoreSummary.averageScore ]
-                            ]
-                        ]
-                    ]
-                , hr [] []
-                , h4 [] [ text "Higher score result" ]
-                , table [ class "armament-level-list" ]
-                    [ tbody [] <|
-                        List.concat <|
-                            List.map
-                                (\rank ->
-                                    [ tr [ class "basic-play-result" ]
-                                        [ th [ colspan 2 ] [ span [] [ text "Score" ] ]
-                                        , td [ colspan 2, class "number" ] [ span [] [ text <| formatComma rank.score ] ]
-                                        , td [ colspan 2, class "play-time" ] [ span [] [ text rank.playTime ] ]
-                                        ]
-                                    ]
-                                        ++ (List.map viewArmaments <| LS.chunksOfLeft 2 rank.armaments)
-                                )
-                                summary.scoreRanking
-                    ]
-                ]
+            [ viewScoreSummary data
+            , h1 [] [ text "High score play record" ]
+            , viewScoreRanking "Hard" data.hard
+            , viewScoreRanking "Normal" data.normal
             ]
 
 
-viewArmaments : List Armament -> Html Msg
-viewArmaments arms =
-    tr [] <|
-        List.concat <|
-            List.map viewArmament arms
+viewScoreRanking : String -> Maybe CharacterSummaryElement -> Html Msg
+viewScoreRanking mode mSummary =
+    case mSummary of
+        Nothing ->
+            div [ class "score-ranking-container" ]
+                [ h3 [] [ text mode ]
+                , span [] [ text "(No record)" ]
+                ]
+
+        Just summary ->
+            div [ class "score-ranking-container" ] <|
+                [ h3 [] [ text mode ] ]
+                    ++ List.map viewScoreRank summary.scoreRanking
 
 
-viewArmament : Armament -> List (Html Msg)
-viewArmament arm =
-    [ td [ colspan 3, class "armament-level-container" ]
-        [ img [ src <| "https://static.time-locker.jabara.info/img/ARM_" ++ String.replace " " "_" arm.name ++ ".png" ] []
-        , span [ class "armament-name" ] [ text <| arm.name ]
+viewScoreRank : PlayResult -> Html Msg
+viewScoreRank rank =
+    div [ class "score-rank-container" ]
+        [ table []
+            [ tbody []
+                [ tr []
+                    [ th [] [ text "Score" ]
+                    , td [] [ text <| formatComma rank.score ]
+                    ]
+                , tr []
+                    [ th [] [ text "Play time" ]
+                    , td [] [ text <| String.replace "T" " " <| String.dropRight 8 <| rank.playTime ]
+                    ]
+                ]
+            ]
+        , div [ class "armaments-container" ] <| List.map viewArmament rank.armaments
         ]
-    , td [ colspan 3, class "armament-level-container" ] [ span [ class "armament-level" ] [ text <| String.fromInt arm.level ] ]
-    ]
+
+
+viewArmament : Armament -> Html Msg
+viewArmament arm =
+    div [ class "armament-container" ]
+        [ img [ class "armament", src <| "https://static.time-locker.jabara.info/img/ARM_" ++ String.replace " " "_" arm.name ++ ".png", alt arm.name ] []
+        , span [ class "armament-level" ] [ text <| formatComma arm.level ]
+        ]
+
+
+viewScoreSummary : CharacterSummary -> Html Msg
+viewScoreSummary summary =
+    let
+        mHardSummary =
+            summary.hard
+
+        mNormalSummary =
+            summary.normal
+
+        playCountMapper =
+            \sum -> formatComma sum.scoreSummary.playCount
+
+        highScoreMapper =
+            \sum -> formatComma sum.scoreSummary.highScore
+
+        averageScoreMapper =
+            \sum -> formatComma <| round sum.scoreSummary.averageScore
+    in
+    table [ class "score-summary-container" ]
+        [ thead []
+            [ tr []
+                [ th [] []
+                , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
+                , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
+                ]
+            ]
+        , tbody []
+            [ tr []
+                [ th [] [ text "Play count" ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardSummary ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalSummary ]
+                ]
+            , tr []
+                [ th [] [ text "High score" ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mHardSummary ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mNormalSummary ]
+                ]
+            , tr []
+                [ th [] [ text "Average score" ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mHardSummary ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mNormalSummary ]
+                ]
+            ]
+        ]
 
 
 viewNotFound : Model -> Document Msg
