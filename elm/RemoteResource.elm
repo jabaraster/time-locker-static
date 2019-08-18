@@ -1,4 +1,4 @@
-module RemoteResource exposing (RemoteResource, emptyRemoteResource, finishLoading, resourceValue, startLoading, updateData, updateLastLoadedTime)
+module RemoteResource exposing (RemoteResource, empty, finishLoading, new, resourceValue, startLoading, updateData, updateLastLoadedTime)
 
 import Http
 import Time
@@ -11,8 +11,14 @@ type alias RemoteResource a =
     }
 
 
-emptyRemoteResource =
+empty : RemoteResource a
+empty =
     { data = Nothing, loading = False, lastLoadedTime = Nothing }
+
+
+new : Result Http.Error a -> RemoteResource a
+new res =
+    { empty | data = Just res }
 
 
 resourceValue : RemoteResource a -> b -> (a -> b) -> b

@@ -1,4 +1,4 @@
-module Types exposing (Armament, CharacterList, CharacterListElement, CharacterName, CharacterSummary, CharacterSummaryElement, PlayResult, ScoreData, armamentDecoder, characterListDecoder, characterListElementDecoder, characterSummaryDecoder, characterSummaryElementDecoder, playResultDecoder, scoreDataDecoder)
+module Types exposing (Armament, CharacterList, CharacterListElement, CharacterName, CharacterSummary, CharacterSummaryElement, PlayResult, ScoreData, armamentDecoder, characterListDecoder, characterListElementDecoder, characterSummaryDecoder, characterSummaryElementDecoder, emptyCharacterSummary, playResultDecoder, scoreDataDecoder)
 
 import Json.Decode as D
 
@@ -63,15 +63,17 @@ type alias PlayResult =
     { score : Int
     , armaments : List Armament
     , reasons : List String
+    , playTime : String
     }
 
 
 playResultDecoder : D.Decoder PlayResult
 playResultDecoder =
-    D.map3 PlayResult
+    D.map4 PlayResult
         (D.field "score" D.int)
         (D.field "armaments" <| D.list armamentDecoder)
         (D.field "reasons" <| D.list D.string)
+        (D.field "created" D.string)
 
 
 type alias CharacterSummaryElement =
@@ -92,6 +94,10 @@ type alias CharacterSummary =
     , normal : Maybe CharacterSummaryElement
     , hard : Maybe CharacterSummaryElement
     }
+
+
+emptyCharacterSummary =
+    { character = "", normal = Nothing, hard = Nothing }
 
 
 characterSummaryDecoder : D.Decoder CharacterSummary

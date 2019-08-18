@@ -48,10 +48,40 @@ table.character-list {
        }
     }
  }
+ .character-summary-container {
+     display: inline-block;
+     margin: .5em;
+     padding: .5em;
+
+     table tbody.summary tr {
+         border-bottom: solid 1px rgba(100,100,100,.6);
+     }
+     table.armament-level-list {
+         tbody tr.basic-play-result > * {
+             padding-top: .5em;
+         }
+     }
+     td.number, td.play-time {
+         padding-left: 1em;
+     }
+     td.armament-level-container {
+         > img {
+             margin-right: 3px;
+             width: 24px;
+             height: 24px;
+         }
+         > .armament-level {
+             padding-left: 1em;
+         }
+     }
+ }
 
 /************************
  * General
  ************************/
+ul {
+    list-style: none;
+}
 th {
     word-break: break-all;
 }

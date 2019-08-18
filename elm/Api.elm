@@ -1,13 +1,21 @@
-module Api exposing (getCharacterList)
+module Api exposing (getCharacterList, getCharacterSummary)
 
 import Http
 import Json.Decode as D
-import Types
+import Types exposing (..)
 
 
-getCharacterList : (Result Http.Error Types.CharacterList -> msg) -> Cmd msg
+getCharacterList : (Result Http.Error CharacterList -> msg) -> Cmd msg
 getCharacterList operation =
     Http.get
         { url = "/api/character/"
-        , expect = Http.expectJson operation Types.characterListDecoder
+        , expect = Http.expectJson operation characterListDecoder
+        }
+
+
+getCharacterSummary : CharacterName -> (Result Http.Error CharacterSummary -> msg) -> Cmd msg
+getCharacterSummary name operation =
+    Http.get
+        { url = "/api/character/" ++ name
+        , expect = Http.expectJson operation characterSummaryDecoder
         }
