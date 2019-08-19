@@ -52,6 +52,7 @@ type Msg
     | LoadCharacterList
     | GetCharacterListLoadedTime Time.Posix
     | CharacterSummaryLoaded CharacterName (Result Http.Error CharacterSummary)
+    | LoadCharacterSummary CharacterName
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -81,7 +82,10 @@ init _ url key =
                 characterName =
                     Maybe.withDefault name <| Url.percentDecode name
             in
-            ( { model | page = CharacterSummaryPage characterName }
+            ( { model
+                | page = CharacterSummaryPage characterName
+                , characterSummaryList = Dict.insert characterName RR.emptyLoading model.characterSummaryList
+              }
             , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
             )
 
@@ -145,7 +149,10 @@ update msg model =
                     in
                     case Dict.get characterName model.characterSummaryList of
                         Nothing ->
-                            ( { newModel | page = CharacterSummaryPage characterName }
+                            ( { newModel
+                                | page = CharacterSummaryPage characterName
+                                , characterSummaryList = Dict.insert characterName RR.emptyLoading model.characterSummaryList
+                              }
                             , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
                             )
 
@@ -185,6 +192,25 @@ update msg model =
                     , Cmd.none
                     )
 
+        LoadCharacterSummary characterName ->
+            case Dict.get characterName model.characterSummaryList of
+                Nothing ->
+                    let
+                        emp =
+                            RR.empty
+
+                        newRr =
+                            { emp | loading = True }
+                    in
+                    ( { model | characterSummaryList = Dict.insert characterName newRr model.characterSummaryList }
+                    , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+                    )
+
+                Just rr ->
+                    ( { model | characterSummaryList = Dict.update characterName (Maybe.map RR.startLoading) model.characterSummaryList }
+                    , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+                    )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
@@ -194,6 +220,7 @@ subscriptions _ =
 isLoading : Model -> Bool
 isLoading model =
     model.characters.loading
+        || (List.any (\rr -> rr.loading) <| Dict.values model.characterSummaryList)
 
 
 view : Model -> Document Msg
@@ -208,19 +235,14 @@ view model =
                     viewNotFound model
 
                 CharacterSummaryPage name ->
-                    case Dict.get name model.characterSummaryList of
-                        Nothing ->
-                            viewCharacterSummary name <| Nothing
-
-                        Just inList ->
-                            viewCharacterSummary name <| Just inList
+                    viewCharacterSummary name <| Dict.get name model.characterSummaryList
 
         loading =
             if isLoading model then
                 [ span [ class "fas fa-spinner loading loading-icon" ] [] ]
 
             else
-                []
+                [ span [ class "fas fa-spinner loading loading-icon hide" ] [] ]
     in
     { title = doc.title ++ " | Jabara's Time Locker Analyzing"
     , body = loading ++ doc.body
@@ -243,14 +265,14 @@ viewCharacterSummary characterName mResource =
                             ]
 
                         Just rr ->
-                            viewCharacterSummaryCore rr
+                            viewCharacterSummaryCore characterName rr
                    )
         ]
     }
 
 
-viewCharacterSummaryCore : RemoteResource CharacterSummary -> List (Html Msg)
-viewCharacterSummaryCore rr =
+viewCharacterSummaryCore : CharacterName -> RemoteResource CharacterSummary -> List (Html Msg)
+viewCharacterSummaryCore characterName rr =
     case rr.data of
         Nothing ->
             [ span [] [ text "Now loading..." ]
@@ -258,11 +280,14 @@ viewCharacterSummaryCore rr =
             ]
 
         Just (Err _) ->
-            [ span [] [ text "Fail loading..." ] ]
+            [ span [] [ text "Fail loading..." ]
+            , reloadButton rr.loading <| LoadCharacterSummary characterName
+            ]
 
         Just (Ok data) ->
-            [ viewScoreSummary data
-            , h1 [] [ text "High score play record" ]
+            [ reloadButton rr.loading <| LoadCharacterSummary characterName
+            , viewScoreSummary data
+            , h1 [] [ text "High score play" ]
             , viewScoreRanking "Hard" data.hard
             , viewScoreRanking "Normal" data.normal
             ]
@@ -369,12 +394,7 @@ viewHome model =
 
                 Just (Ok cs) ->
                     div []
-                        [ button
-                            [ class "btn btn-default"
-                            , onClick LoadCharacterList
-                            ]
-                            [ i [ classList [ ( "fas fa-sync", True ), ( "loading", model.characters.loading ) ] ] [] ]
-                        ]
+                        [ reloadButton model.characters.loading LoadCharacterList ]
                         :: List.map
                             (\character ->
                                 a [ href <| "/character/" ++ character.character ]
@@ -445,3 +465,12 @@ formatComma =
 loadingIcon : Html.Html msg
 loadingIcon =
     span [ class "fas fa-sync loading" ] []
+
+
+reloadButton : Bool -> Msg -> Html Msg
+reloadButton loading handler =
+    button
+        [ class "btn btn-default"
+        , onClick handler
+        ]
+        [ i [ classList [ ( "fas fa-sync", True ), ( "loading", loading ) ] ] [] ]
