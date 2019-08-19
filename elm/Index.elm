@@ -238,7 +238,7 @@ viewCharacterSummary characterName mResource =
             ]
                 ++ (case mResource of
                         Nothing ->
-                            [ span [] [ text "now loading..." ]
+                            [ span [] [ text "Now loading..." ]
                             , loadingIcon
                             ]
 
@@ -405,10 +405,7 @@ viewHome model =
             [ h1 [] [ text msg ]
             , ul
                 []
-                [ li [] [ a [ href "/score/character-average", target "time-locker-analyzer-table" ] [ text "Character average score" ] ]
-                , li [] [ a [ href "/score/character-high", target "time-locker-analyzer-table" ] [ text "Character high score" ] ]
-                , li [] [ a [ href "/arms/score-per-level", target "time-locker-analyzer-table" ] [ text "Score per armament level" ] ]
-                ]
+                [ li [] [ a [ href "/arms/score-per-level", target "time-locker-analyzer-table" ] [ text "Score per armament level" ] ] ]
             ]
                 ++ [ hr [] [] ]
                 ++ tags
