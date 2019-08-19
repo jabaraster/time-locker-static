@@ -286,18 +286,9 @@ viewScoreRanking mode mSummary =
 viewScoreRank : PlayResult -> Html Msg
 viewScoreRank rank =
     div [ class "score-rank-container" ]
-        [ table []
-            [ tbody []
-                [ tr []
-                    [ th [] [ text "Score" ]
-                    , td [] [ text <| formatComma rank.score ]
-                    ]
-                , tr []
-                    [ th [] [ text "Play time" ]
-                    , td [] [ text <| String.replace "T" " " <| String.dropRight 8 <| rank.playTime ]
-                    ]
-                ]
-            ]
+        [ span [ class "score-label" ] [ text "Score: " ]
+        , span [ class "score" ] [ text <| formatComma rank.score ]
+        , span [ class "play-time" ] [ text <| String.replace "T" " " <| String.dropRight 8 <| rank.playTime ]
         , div [ class "armaments-container" ] <| List.map viewArmament rank.armaments
         ]
 
@@ -328,7 +319,7 @@ viewScoreSummary summary =
         averageScoreMapper =
             \sum -> formatComma <| round sum.scoreSummary.averageScore
     in
-    table [ class "score-summary-container" ]
+    table [ class "score-table score-summary-container" ]
         [ thead []
             [ tr []
                 [ th [] []
@@ -415,7 +406,7 @@ viewHome model =
 
 tagScore : CharacterListElement -> Html.Html msg
 tagScore c =
-    table [ class "character-list" ]
+    table [ class "score-table character-list" ]
         [ tbody [] <|
             [ tr [] [ th [] [ text "Hard" ] ] ]
                 ++ tagHighScore c.hard
@@ -428,15 +419,15 @@ tagHighScore : Maybe ScoreData -> List (Html.Html msg)
 tagHighScore mScore =
     [ tr [ class "score-element" ]
         [ th [] [ text "Play count" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma score.playCount) mScore ]
+        , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma score.playCount) mScore ]
         ]
     , tr [ class "score-element" ]
         [ th [] [ text "High score" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma score.highScore) mScore ]
+        , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma score.highScore) mScore ]
         ]
     , tr [ class "score-element" ]
         [ th [] [ text "Average score" ]
-        , td [] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma <| round score.averageScore) mScore ]
+        , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map (\score -> formatComma <| round score.averageScore) mScore ]
         ]
     ]
 
