@@ -23,6 +23,7 @@ type SortProperty
     = HighScore
     | AverageScore
     | Name
+    | PlayCount
 
 
 type SortOrder

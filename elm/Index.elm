@@ -454,10 +454,11 @@ viewDashboard model =
                     ]
 
                 Just (Ok cs) ->
-                    div []
-                        [ reloadButton model.characters.loading LoadCharacterList ]
-                        :: div [ class "list-controller-container" ]
-                            [ span [] [ text "Sort: " ]
+                    h3 [] [ text "Character list" ]
+                        :: div []
+                            [ reloadButton model.characters.loading LoadCharacterList ]
+                        :: div [ class "sort-controller-container" ]
+                            [ h4 [] [ text "Sort" ]
                             , div [ class "sort-parameter" ]
                                 [ checkboxOrder "Ascendant" model Ascendant
                                 , checkboxOrder "Descendant" model Descendant
@@ -470,6 +471,7 @@ viewDashboard model =
                                 [ checkboxProperty "Name" model Name
                                 , checkboxProperty "High score" model HighScore
                                 , checkboxProperty "Average score" model AverageScore
+                                , checkboxProperty "Play count" model PlayCount
                                 ]
                             ]
                         :: List.map
@@ -587,6 +589,17 @@ sortCharacters sortState origin =
                         .normal
             in
             sortCore sortState.order (Maybe.withDefault 0 << Maybe.map .averageScore << f) origin
+
+        PlayCount ->
+            let
+                f =
+                    if sortState.mode == Hard then
+                        .hard
+
+                    else
+                        .normal
+            in
+            sortCore sortState.order (Maybe.withDefault 0 << Maybe.map .playCount << f) origin
 
         Name ->
             let
