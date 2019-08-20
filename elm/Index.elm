@@ -1,4 +1,4 @@
-module Index exposing (Model, Msg(..), Page(..), characterImageUrl, init, main, parseUrl, subscriptions, update, view, viewCharacterSummary, viewHome, viewNotFound)
+module Index exposing (..)
 
 import Api
 import Browser exposing (Document, UrlRequest)
@@ -40,6 +40,7 @@ type alias Model =
     { key : Nav.Key
     , page : Page
     , characters : RemoteResource CharacterList
+    , charactersSortState : SortState
     , characterSummaryList : Dict CharacterName (RemoteResource CharacterSummary)
     }
 
@@ -51,6 +52,7 @@ type Msg
     | CharacterListLoaded (Result Http.Error CharacterList)
     | LoadCharacterList
     | GetCharacterListLoadedTime Time.Posix
+    | CharactersSortStateChanged SortState
     | CharacterSummaryLoaded CharacterName (Result Http.Error CharacterSummary)
     | LoadCharacterSummary CharacterName
 
@@ -65,6 +67,11 @@ init _ url key =
             { key = key
             , page = page
             , characters = RR.empty
+            , charactersSortState =
+                { property = Name
+                , mode = Hard
+                , order = Ascendant
+                }
             , characterSummaryList = Dict.empty
             }
     in
@@ -174,6 +181,22 @@ update msg model =
         GetCharacterListLoadedTime now ->
             ( { model | characters = RR.updateLastLoadedTime model.characters now }, Cmd.none )
 
+        CharactersSortStateChanged sortState ->
+            case model.characters.data of
+                Nothing ->
+                    ( { model | charactersSortState = sortState }, Cmd.none )
+
+                Just (Err _) ->
+                    ( { model | charactersSortState = sortState }, Cmd.none )
+
+                Just (Ok cs) ->
+                    ( { model
+                        | charactersSortState = sortState
+                        , characters = RR.updateSuccessData model.characters <| sortCharacters sortState cs
+                      }
+                    , Cmd.none
+                    )
+
         CharacterSummaryLoaded characterName res ->
             case Dict.get characterName model.characterSummaryList of
                 Nothing ->
@@ -220,7 +243,7 @@ subscriptions _ =
 isLoading : Model -> Bool
 isLoading model =
     model.characters.loading
-        || (List.any (\rr -> rr.loading) <| Dict.values model.characterSummaryList)
+        || (List.any .loading <| Dict.values model.characterSummaryList)
 
 
 view : Model -> Document Msg
@@ -229,7 +252,7 @@ view model =
         doc =
             case model.page of
                 HomePage ->
-                    viewHome model
+                    viewDashboard model
 
                 NotFoundPage ->
                     viewNotFound model
@@ -287,7 +310,7 @@ viewCharacterSummaryCore characterName rr =
         Just (Ok data) ->
             [ reloadButton rr.loading <| LoadCharacterSummary characterName
             , viewScoreSummary data
-            , h1 [] [ text "High score play" ]
+            , h1 [] [ text "Score ranking" ]
             , viewScoreRanking "Hard" data.hard
             , viewScoreRanking "Normal" data.normal
             ]
@@ -379,11 +402,49 @@ viewNotFound _ =
     }
 
 
-viewHome : Model -> Document Msg
-viewHome model =
+checkbox : String -> Bool -> msg -> Html msg
+checkbox labelText checked_ handler =
+    label [ onClick handler ]
+        [ span [ classList [ ( "fas fa-check", True ), ( "checked", checked_ ), ( "unchecked", not checked_ ) ] ] []
+        , span [] [ text labelText ]
+        ]
+
+
+checkboxOrder : String -> Model -> SortOrder -> Html Msg
+checkboxOrder labelText model order =
+    let
+        sortState =
+            model.charactersSortState
+    in
+    checkbox labelText (model.charactersSortState.order == order) <| CharactersSortStateChanged { sortState | order = order }
+
+
+checkboxMode : String -> Model -> GameMode -> Html Msg
+checkboxMode labelText model mode =
+    let
+        sortState =
+            model.charactersSortState
+    in
+    checkbox labelText (model.charactersSortState.mode == mode) <| CharactersSortStateChanged { sortState | mode = mode }
+
+
+checkboxProperty : String -> Model -> SortProperty -> Html Msg
+checkboxProperty labelText model property =
+    let
+        sortState =
+            model.charactersSortState
+    in
+    checkbox labelText (model.charactersSortState.property == property) <| CharactersSortStateChanged { sortState | property = property }
+
+
+viewDashboard : Model -> Document Msg
+viewDashboard model =
     let
         msg =
             "Dashboard"
+
+        sortState =
+            model.charactersSortState
 
         tags =
             case model.characters.data of
@@ -395,6 +456,22 @@ viewHome model =
                 Just (Ok cs) ->
                     div []
                         [ reloadButton model.characters.loading LoadCharacterList ]
+                        :: div [ class "list-controller-container" ]
+                            [ span [] [ text "Sort: " ]
+                            , div [ class "sort-parameter" ]
+                                [ checkboxOrder "Ascendant" model Ascendant
+                                , checkboxOrder "Descendant" model Descendant
+                                ]
+                            , div [ class "sort-parameter" ]
+                                [ checkboxMode "Hard" model Hard
+                                , checkboxMode "Normal" model Normal
+                                ]
+                            , div [ class "sort-parameter" ]
+                                [ checkboxProperty "Name" model Name
+                                , checkboxProperty "High score" model HighScore
+                                , checkboxProperty "Average score" model AverageScore
+                                ]
+                            ]
                         :: List.map
                             (\character ->
                                 a [ href <| "/character/" ++ character.character ]
@@ -474,3 +551,66 @@ reloadButton loading handler =
         , onClick handler
         ]
         [ i [ classList [ ( "fas fa-sync", True ), ( "loading", loading ) ] ] [] ]
+
+
+sortCore : SortOrder -> (CharacterListElement -> number) -> CharacterList -> CharacterList
+sortCore order comparator =
+    case order of
+        Ascendant ->
+            List.sortBy comparator
+
+        Descendant ->
+            List.sortBy (negate << comparator)
+
+
+sortCharacters : SortState -> CharacterList -> CharacterList
+sortCharacters sortState origin =
+    case sortState.property of
+        HighScore ->
+            let
+                f =
+                    if sortState.mode == Hard then
+                        .hard
+
+                    else
+                        .normal
+            in
+            sortCore sortState.order (Maybe.withDefault 0 << Maybe.map .highScore << f) origin
+
+        AverageScore ->
+            let
+                f =
+                    if sortState.mode == Hard then
+                        .hard
+
+                    else
+                        .normal
+            in
+            sortCore sortState.order (Maybe.withDefault 0 << Maybe.map .averageScore << f) origin
+
+        Name ->
+            let
+                f =
+                    if sortState.mode == Hard then
+                        .hard
+
+                    else
+                        .normal
+            in
+            List.sortWith (\c0 c1 -> turnOverOrder sortState.order <| compare c0.character c1.character) origin
+
+
+turnOverOrder : SortOrder -> Order -> Order
+turnOverOrder order src =
+    case ( order, src ) of
+        ( _, EQ ) ->
+            EQ
+
+        ( Ascendant, o ) ->
+            o
+
+        ( Descendant, GT ) ->
+            LT
+
+        ( Descendant, LT ) ->
+            GT

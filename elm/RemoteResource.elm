@@ -44,6 +44,11 @@ updateData rr newData =
     { rr | data = Just newData, loading = False }
 
 
+updateSuccessData : RemoteResource a -> a -> RemoteResource a
+updateSuccessData rr newData =
+    { rr | data = Just <| Ok newData, loading = False }
+
+
 startLoading : RemoteResource a -> RemoteResource a
 startLoading rr =
     { rr | loading = True }

@@ -1,4 +1,4 @@
-module Types exposing (Armament, CharacterList, CharacterListElement, CharacterName, CharacterSummary, CharacterSummaryElement, PlayResult, ScoreData, armamentDecoder, characterListDecoder, characterListElementDecoder, characterSummaryDecoder, characterSummaryElementDecoder, emptyCharacterSummary, playResultDecoder, scoreDataDecoder)
+module Types exposing (..)
 
 import Json.Decode as D
 
@@ -12,6 +12,39 @@ type alias CharacterListElement =
     , normal : Maybe ScoreData
     , hard : Maybe ScoreData
     }
+
+
+type GameMode
+    = Hard
+    | Normal
+
+
+type SortProperty
+    = HighScore
+    | AverageScore
+    | Name
+
+
+type SortOrder
+    = Ascendant
+    | Descendant
+
+
+type alias SortState =
+    { property : SortProperty
+    , mode : GameMode
+    , order : SortOrder
+    }
+
+
+getScoreForMode : GameMode -> CharacterListElement -> Maybe ScoreData
+getScoreForMode mode =
+    case mode of
+        Hard ->
+            .hard
+
+        Normal ->
+            .normal
 
 
 characterListElementDecoder : D.Decoder CharacterListElement
