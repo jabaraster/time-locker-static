@@ -38,6 +38,13 @@ type alias SortState =
     }
 
 
+initialSortState =
+    { property = Name
+    , mode = Hard
+    , order = Ascendant
+    }
+
+
 getScoreForMode : GameMode -> CharacterListElement -> Maybe ScoreData
 getScoreForMode mode =
     case mode of

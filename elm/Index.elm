@@ -9,13 +9,17 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode
+import List.Extra as LE
 import List.Split as LS
 import RemoteResource as RR exposing (RemoteResource)
+import Set
 import Task
 import Time
 import Types exposing (..)
 import Url
+import Url.Builder
 import Url.Parser exposing (..)
+import Url.Parser.Query as Query
 
 
 main : Platform.Program () Model Msg
@@ -30,10 +34,29 @@ main =
         }
 
 
+type PageForParser
+    = DashboardPageW SortState
+    | NotFoundPageW
+    | CharacterSummaryPageW CharacterName
+
+
 type Page
-    = HomePage
+    = DashboardPage
     | NotFoundPage
     | CharacterSummaryPage CharacterName
+
+
+convPage : PageForParser -> Page
+convPage src =
+    case src of
+        NotFoundPageW ->
+            NotFoundPage
+
+        DashboardPageW _ ->
+            DashboardPage
+
+        CharacterSummaryPageW name ->
+            CharacterSummaryPage <| Maybe.withDefault name <| Url.percentDecode name
 
 
 type alias Model =
@@ -65,48 +88,115 @@ init _ url key =
 
         model =
             { key = key
-            , page = page
             , characters = RR.empty
-            , charactersSortState =
-                { property = Name
-                , mode = Hard
-                , order = Ascendant
-                }
+            , page = convPage page
+            , charactersSortState = initialSortState
             , characterSummaryList = Dict.empty
             }
     in
     case page of
-        HomePage ->
-            ( { model | characters = RR.startLoading model.characters }
+        DashboardPageW sortState ->
+            ( { model
+                | characters = RR.startLoading model.characters
+                , charactersSortState = sortState
+              }
             , Api.getCharacterList CharacterListLoaded
             )
 
-        NotFoundPage ->
+        NotFoundPageW ->
             ( model, Cmd.none )
 
-        CharacterSummaryPage name ->
+        CharacterSummaryPageW name ->
             let
                 characterName =
                     Maybe.withDefault name <| Url.percentDecode name
             in
             ( { model
-                | page = CharacterSummaryPage characterName
-                , characterSummaryList = Dict.insert characterName RR.emptyLoading model.characterSummaryList
+                | characterSummaryList = Dict.insert characterName RR.emptyLoading model.characterSummaryList
               }
             , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
             )
 
 
-parseUrl : Url.Url -> Page
+parseUrl : Url.Url -> PageForParser
 parseUrl url =
-    Maybe.withDefault NotFoundPage <|
+    Maybe.withDefault NotFoundPageW <|
         Url.Parser.parse
             (Url.Parser.oneOf
-                [ Url.Parser.map HomePage <| Url.Parser.top
-                , Url.Parser.map CharacterSummaryPage (Url.Parser.s "character" </> Url.Parser.string)
+                [ Url.Parser.map DashboardPageW (Url.Parser.top <?> sortStateQueryParser)
+                , Url.Parser.map CharacterSummaryPageW (Url.Parser.s "character" </> Url.Parser.string)
                 ]
             )
             url
+
+
+enumParser : String -> a -> List ( String, a ) -> Query.Parser a
+enumParser name default keyValues =
+    Query.custom name
+        (\ss ->
+            case ss of
+                [] ->
+                    default
+
+                l ->
+                    let
+                        s =
+                            Set.fromList l
+
+                        mKv =
+                            LE.find (\( key, _ ) -> Set.member key s) keyValues
+                    in
+                    Maybe.withDefault default <| Maybe.map (\( _, value ) -> value) mKv
+        )
+
+
+sortStateQueryParser : Query.Parser SortState
+sortStateQueryParser =
+    Query.map3 SortState
+        (enumParser "sort-property" Name [ ( "name", Name ), ( "high-score", HighScore ), ( "average-score", AverageScore ), ( "play-count", PlayCount ) ])
+        (enumParser "sort-game-mode" Hard [ ( "hard", Hard ), ( "normal", Normal ) ])
+        (enumParser "sort-order" Ascendant [ ( "ascendant", Ascendant ), ( "descendant", Descendant ), ( "asc", Ascendant ), ( "desc", Descendant ) ])
+
+
+sortStateToQueryString : SortState -> List Url.Builder.QueryParameter
+sortStateToQueryString sortState =
+    [ sortPropertyToQueryString sortState.property, gameModeToSortQueryString sortState.mode, sortOrderToQueryString sortState.order ]
+
+
+gameModeToSortQueryString : GameMode -> Url.Builder.QueryParameter
+gameModeToSortQueryString v =
+    case v of
+        Hard ->
+            Url.Builder.string "sort-game-mode" "hard"
+
+        Normal ->
+            Url.Builder.string "sort-game-mode" "normal"
+
+
+sortPropertyToQueryString : SortProperty -> Url.Builder.QueryParameter
+sortPropertyToQueryString v =
+    case v of
+        Name ->
+            Url.Builder.string "sort-property" "name"
+
+        HighScore ->
+            Url.Builder.string "sort-property" "high-score"
+
+        AverageScore ->
+            Url.Builder.string "sort-property" "average-score"
+
+        PlayCount ->
+            Url.Builder.string "sort-property" "play-count"
+
+
+sortOrderToQueryString : SortOrder -> Url.Builder.QueryParameter
+sortOrderToQueryString v =
+    case v of
+        Ascendant ->
+            Url.Builder.string "sort-order" "ascendant"
+
+        Descendant ->
+            Url.Builder.string "sort-order" "descendant"
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -129,10 +219,10 @@ update msg model =
                     parseUrl url
 
                 newModel =
-                    { model | page = page }
+                    { model | page = convPage page }
             in
-            case page of
-                HomePage ->
+            case newModel.page of
+                DashboardPage ->
                     case model.characters.data of
                         Nothing ->
                             let
@@ -169,9 +259,16 @@ update msg model =
                             )
 
         CharacterListLoaded res ->
-            ( { model | characters = RR.updateData model.characters res }
-            , Task.perform GetCharacterListLoadedTime Time.now
-            )
+            case res of
+                Err _ ->
+                    ( { model | characters = RR.updateData model.characters res }
+                    , Task.perform GetCharacterListLoadedTime Time.now
+                    )
+
+                Ok cs ->
+                    ( { model | characters = RR.updateSuccessData model.characters <| sortCharacters model.charactersSortState cs }
+                    , Task.perform GetCharacterListLoadedTime Time.now
+                    )
 
         LoadCharacterList ->
             ( { model | characters = RR.startLoading model.characters }
@@ -182,19 +279,25 @@ update msg model =
             ( { model | characters = RR.updateLastLoadedTime model.characters now }, Cmd.none )
 
         CharactersSortStateChanged sortState ->
+            let
+                cmd =
+                    Nav.replaceUrl model.key <| Url.Builder.absolute [] <| sortStateToQueryString sortState
+            in
             case model.characters.data of
                 Nothing ->
-                    ( { model | charactersSortState = sortState }, Cmd.none )
+                    ( { model | charactersSortState = sortState }
+                    , cmd
+                    )
 
                 Just (Err _) ->
-                    ( { model | charactersSortState = sortState }, Cmd.none )
+                    ( { model | charactersSortState = sortState }, cmd )
 
                 Just (Ok cs) ->
                     ( { model
                         | charactersSortState = sortState
                         , characters = RR.updateSuccessData model.characters <| sortCharacters sortState cs
                       }
-                    , Cmd.none
+                    , cmd
                     )
 
         CharacterSummaryLoaded characterName res ->
@@ -251,7 +354,7 @@ view model =
     let
         doc =
             case model.page of
-                HomePage ->
+                DashboardPage ->
                     viewDashboard model
 
                 NotFoundPage ->
