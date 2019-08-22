@@ -62,3 +62,8 @@ finishLoading rr =
 updateLastLoadedTime : RemoteResource a -> Time.Posix -> RemoteResource a
 updateLastLoadedTime rr newTime =
     { rr | lastLoadedTime = Just newTime }
+
+
+hasData : RemoteResource a -> Bool
+hasData =
+    Maybe.withDefault False << Maybe.map (\_ -> True) << .data

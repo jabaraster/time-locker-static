@@ -279,7 +279,7 @@ viewCharacterSummary characterName mResource =
         [ div [ class "container character-summary" ] <|
             [ header [] [ a [ href "/" ] [ text "< Back to Dashboard" ] ]
             , img [ src <| characterImageUrl characterName 660 460, class "character" ] []
-            , h3 [] [ span [ class "character-name" ] [ text <| characterName ] ]
+            , h3 [] <| span [ class "character-name" ] [ text characterName ] :: characterSummaryReloader characterName mResource
             ]
                 ++ (case mResource of
                         Nothing ->
@@ -294,6 +294,20 @@ viewCharacterSummary characterName mResource =
     }
 
 
+characterSummaryReloader : CharacterName -> Maybe (RemoteResource CharacterSummary) -> List (Html Msg)
+characterSummaryReloader characterName mResource =
+    case mResource of
+        Nothing ->
+            []
+
+        Just rr ->
+            if not (RR.hasData rr) && rr.loading then
+                []
+
+            else
+                [ reloadButton rr.loading <| LoadCharacterSummary characterName ]
+
+
 viewCharacterSummaryCore : CharacterName -> RemoteResource CharacterSummary -> List (Html Msg)
 viewCharacterSummaryCore characterName rr =
     case rr.data of
@@ -304,12 +318,10 @@ viewCharacterSummaryCore characterName rr =
 
         Just (Err _) ->
             [ span [] [ text "Fail loading..." ]
-            , reloadButton rr.loading <| LoadCharacterSummary characterName
             ]
 
         Just (Ok data) ->
-            [ reloadButton rr.loading <| LoadCharacterSummary characterName
-            , viewScoreSummary data
+            [ viewScoreSummary data
             , h1 [] [ text "Score ranking" ]
             , viewScoreRanking "Hard" data.hard
             , viewScoreRanking "Normal" data.normal
