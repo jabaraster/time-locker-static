@@ -422,95 +422,86 @@ checkbox labelText checked_ handler =
         ]
 
 
-checkboxOrder : String -> Model -> SortOrder -> Html Msg
-checkboxOrder labelText model order =
-    let
-        sortState =
-            model.charactersSortState
-    in
-    checkbox labelText (model.charactersSortState.order == order) <| CharactersSortStateChanged { sortState | order = order }
+checkboxOrder : String -> SortState -> SortOrder -> Html Msg
+checkboxOrder labelText sortState order =
+    checkbox labelText (sortState.order == order) <| CharactersSortStateChanged { sortState | order = order }
 
 
-checkboxMode : String -> Model -> GameMode -> Html Msg
-checkboxMode labelText model mode =
-    let
-        sortState =
-            model.charactersSortState
-    in
-    checkbox labelText (model.charactersSortState.mode == mode) <| CharactersSortStateChanged { sortState | mode = mode }
+checkboxMode : String -> SortState -> GameMode -> Html Msg
+checkboxMode labelText sortState mode =
+    checkbox labelText (sortState.mode == mode) <| CharactersSortStateChanged { sortState | mode = mode }
 
 
-checkboxProperty : String -> Model -> SortProperty -> Html Msg
-checkboxProperty labelText model property =
-    let
-        sortState =
-            model.charactersSortState
-    in
-    checkbox labelText (model.charactersSortState.property == property) <| CharactersSortStateChanged { sortState | property = property }
+checkboxProperty : String -> SortState -> SortProperty -> Html Msg
+checkboxProperty labelText sortState property =
+    checkbox labelText (sortState.property == property) <| CharactersSortStateChanged { sortState | property = property }
 
 
 viewDashboard : Model -> Document Msg
 viewDashboard model =
-    let
-        msg =
-            "Dashboard"
-
-        sortState =
-            model.charactersSortState
-
-        tags =
-            case model.characters.data of
-                Nothing ->
-                    [ span [] [ text "Now loading..." ]
-                    , loadingIcon
-                    ]
-
-                Just (Ok cs) ->
-                    h3 [] [ text "Character list", reloadButton model.characters.loading LoadCharacterList ]
-                        :: div [ class "sort-controller-container" ]
-                            [ h4 [] [ text "Sort" ]
-                            , div [ class "sort-parameter" ]
-                                [ checkboxProperty "Name" model Name
-                                , checkboxProperty "High score" model HighScore
-                                , checkboxProperty "Average score" model AverageScore
-                                , checkboxProperty "Play count" model PlayCount
-                                ]
-                            , div [ class "sort-parameter" ]
-                                [ checkboxOrder "Ascendant" model Ascendant
-                                , checkboxOrder "Descendant" model Descendant
-                                ]
-                            , div [ class "sort-parameter" ]
-                                [ checkboxMode "Hard" model Hard
-                                , checkboxMode "Normal" model Normal
-                                ]
-                            ]
-                        :: List.map
-                            (\character ->
-                                a [ href <| "/character/" ++ character.character ]
-                                    [ div [ class "character-image-container-floating" ]
-                                        [ img [ src <| characterImageUrl character.character 65 65, alt character.character, class "character" ] []
-                                        , span [ class "character-name" ] [ text character.character ]
-                                        , tagScore character
-                                        ]
-                                    ]
-                            )
-                            cs
-
-                Just (Err _) ->
-                    [ span [] [ text "Fail loading characters..." ] ]
-    in
-    { title = msg
+    { title = "Dashboard"
     , body =
         [ div [ class "container" ] <|
-            [ h1 [] [ text msg ]
-            , ul
-                []
-                [ li [] [ a [ href "/arms/score-per-level", target "time-locker-analyzer-table" ] [ text "Score per armament level" ] ] ]
-            ]
-                ++ [ hr [] [] ]
-                ++ tags
+            viewDashboardHeader
+                :: hr [] []
+                :: viewCharacterList model.characters model.charactersSortState
         ]
     }
+
+
+viewDashboardHeader : Html Msg
+viewDashboardHeader =
+    div [ class "container" ] <|
+        [ h1 [] [ text "Dashboard" ]
+        , ul
+            []
+            [ li [] [ a [ href "/arms/score-per-level", target "time-locker-analyzer-table" ] [ text "Score per armament level" ] ] ]
+        ]
+
+
+viewCharacterList : RemoteResource CharacterList -> SortState -> List (Html Msg)
+viewCharacterList characters sortState =
+    case characters.data of
+        Nothing ->
+            [ h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
+            , span [] [ text "Now loading..." ]
+            ]
+
+        Just (Err _) ->
+            [ h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
+            , span [] [ text "Fail loading characters..." ]
+            ]
+
+        Just (Ok cs) ->
+            h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
+                :: div [ class "sort-controller-container" ]
+                    [ h4 [] [ text "Sort" ]
+                    , div [ class "sort-parameter" ]
+                        [ checkboxProperty "Name" sortState Name
+                        , checkboxProperty "High score" sortState HighScore
+                        , checkboxProperty "Average score" sortState AverageScore
+                        , checkboxProperty "Play count" sortState PlayCount
+                        ]
+                    , div [ class "sort-parameter" ]
+                        [ checkboxOrder "Ascendant" sortState Ascendant
+                        , checkboxOrder "Descendant" sortState Descendant
+                        ]
+                    , div [ class "sort-parameter" ]
+                        [ checkboxMode "Hard" sortState Hard
+                        , checkboxMode "Normal" sortState Normal
+                        ]
+                    ]
+                :: List.map
+                    (\character ->
+                        a [ href <| "/character/" ++ character.character ]
+                            [ div [ class "character-image-container-floating" ]
+                                [ img [ src <| characterImageUrl character.character 65 65, alt character.character, class "character" ] []
+                                , span [ class "character-name" ] [ text character.character ]
+                                , tagScore character
+                                ]
+                            ]
+                    )
+                    cs
 
 
 tagScore : CharacterListElement -> Html.Html msg
