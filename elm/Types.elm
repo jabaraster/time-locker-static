@@ -123,6 +123,23 @@ characterSummaryElementDecoder =
         (D.field "scoreRanking" <| D.list playResultDecoder)
 
 
+type alias CharacterScoreRanking =
+    { created : String
+    , character : CharacterName
+    , mode : GameMode
+    , score : Int
+    , scoreRank : Int
+    , armaments : List Armament
+    , reasons : List String
+    }
+
+
+type alias ScoreRanking =
+    { hard : List CharacterScoreRanking
+    , normal : List CharacterScoreRanking
+    }
+
+
 type alias CharacterSummary =
     { character : CharacterName
     , normal : Maybe CharacterSummaryElement

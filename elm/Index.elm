@@ -454,11 +454,15 @@ viewDashboard model =
                     ]
 
                 Just (Ok cs) ->
-                    h3 [] [ text "Character list" ]
-                        :: div []
-                            [ reloadButton model.characters.loading LoadCharacterList ]
+                    h3 [] [ text "Character list", reloadButton model.characters.loading LoadCharacterList ]
                         :: div [ class "sort-controller-container" ]
                             [ h4 [] [ text "Sort" ]
+                            , div [ class "sort-parameter" ]
+                                [ checkboxProperty "Name" model Name
+                                , checkboxProperty "High score" model HighScore
+                                , checkboxProperty "Average score" model AverageScore
+                                , checkboxProperty "Play count" model PlayCount
+                                ]
                             , div [ class "sort-parameter" ]
                                 [ checkboxOrder "Ascendant" model Ascendant
                                 , checkboxOrder "Descendant" model Descendant
@@ -466,12 +470,6 @@ viewDashboard model =
                             , div [ class "sort-parameter" ]
                                 [ checkboxMode "Hard" model Hard
                                 , checkboxMode "Normal" model Normal
-                                ]
-                            , div [ class "sort-parameter" ]
-                                [ checkboxProperty "Name" model Name
-                                , checkboxProperty "High score" model HighScore
-                                , checkboxProperty "Average score" model AverageScore
-                                , checkboxProperty "Play count" model PlayCount
                                 ]
                             ]
                         :: List.map
@@ -549,7 +547,7 @@ loadingIcon =
 reloadButton : Bool -> Msg -> Html Msg
 reloadButton loading handler =
     button
-        [ class "btn btn-default"
+        [ class "btn btn-default reloader"
         , onClick handler
         ]
         [ i [ classList [ ( "fas fa-sync", True ), ( "loading", loading ) ] ] [] ]
