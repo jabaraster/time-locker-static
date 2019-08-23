@@ -577,6 +577,10 @@ viewCharacterList characters sortState =
 
         Just (Ok cs) ->
             h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
+                :: div []
+                    [ span [ class "character-count" ] [ text <| String.fromInt <| List.length cs ]
+                    , span [] [ text " characters." ]
+                    ]
                 :: div [ class "sort-controller-container" ]
                     [ h4 [] [ text "Sort" ]
                     , div [ class "sort-parameter" ]
