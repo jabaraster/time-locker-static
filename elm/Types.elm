@@ -1,6 +1,7 @@
 module Types exposing (Armament, CharacterList, CharacterListElement, CharacterName, CharacterScoreRanking, CharacterSummary, CharacterSummaryElement, GameMode(..), PlayResult, ScoreData, ScoreRanking, SortOrder(..), SortProperty(..), SortState, TotalPlayState, armamentDecoder, characterListDecoder, characterListElementDecoder, characterSummaryDecoder, characterSummaryElementDecoder, emptyCharacterSummary, getScoreForMode, initialSortState, playResultDecoder, scoreDataDecoder, totalPlayStateDecoder)
 
 import Json.Decode as D
+import Maybe.Extra as ME
 
 
 type alias CharacterName =
@@ -82,7 +83,11 @@ armamentDecoder : D.Decoder Armament
 armamentDecoder =
     D.map2 Armament
         (D.field "name" D.string)
-        (D.field "level" D.int)
+        (D.field "level"
+            (D.andThen (ME.unwrap (D.succeed 0) (\i -> D.succeed i))
+                (D.maybe D.int)
+            )
+        )
 
 
 type alias ScoreData =
