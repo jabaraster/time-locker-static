@@ -321,7 +321,7 @@ update msg model =
                 Nothing ->
                     ( { model
                         | characterSummaryList =
-                            Dict.insert characterName (RR.new res) model.characterSummaryList
+                            Dict.insert characterName (RR.new <| res) model.characterSummaryList
                       }
                     , Cmd.none
                     )
@@ -337,14 +337,7 @@ update msg model =
         LoadCharacterSummary characterName ->
             case Dict.get characterName model.characterSummaryList of
                 Nothing ->
-                    let
-                        emp =
-                            RR.empty
-
-                        newRr =
-                            { emp | loading = True }
-                    in
-                    ( { model | characterSummaryList = Dict.insert characterName newRr model.characterSummaryList }
+                    ( { model | characterSummaryList = Dict.insert characterName (RR.startLoading RR.empty) model.characterSummaryList }
                     , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
                     )
 
@@ -497,51 +490,6 @@ viewArmament arm =
 viewScoreSummary : CharacterSummary -> Html Msg
 viewScoreSummary summary =
     viewScoreSummaryCore (Maybe.map .scoreSummary summary.hard) (Maybe.map .scoreSummary summary.normal)
-
-
-
---    let
---        mHardSummary =
---            summary.hard
---
---        mNormalSummary =
---            summary.normal
---
---        playCountMapper =
---            \sum -> formatComma sum.scoreSummary.playCount
---
---        highScoreMapper =
---            \sum -> formatComma sum.scoreSummary.highScore
---
---        averageScoreMapper =
---            \sum -> formatComma <| round sum.scoreSummary.averageScore
---    in
---    table [ class "score-table score-summary-container" ]
---        [ thead []
---            [ tr []
---                [ th [] []
---                , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
---                , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
---                ]
---            ]
---        , tbody []
---            [ tr []
---                [ th [] [ text "Play count" ]
---                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardSummary ]
---                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalSummary ]
---                ]
---            , tr []
---                [ th [] [ text "High score" ]
---                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mHardSummary ]
---                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mNormalSummary ]
---                ]
---            , tr []
---                [ th [] [ text "Average score" ]
---                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mHardSummary ]
---                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mNormalSummary ]
---                ]
---            ]
---        ]
 
 
 viewScoreSummaryCore : Maybe ScoreData -> Maybe ScoreData -> Html Msg
