@@ -231,15 +231,12 @@ update msg model =
 
                         ( tp, mTpCmd ) =
                             RR.loadIfNecessary model.totalPlayState (Api.getTotalPlayState TotalPlayStateLoaded)
-
-                        cmds =
-                            Cmd.batch <| ME.values [ mCsCmd, mTpCmd ]
                     in
                     ( { newModel
                         | characters = cs
                         , totalPlayState = tp
                       }
-                    , cmds
+                    , Cmd.batch <| ME.values [ mCsCmd, mTpCmd ]
                     )
 
                 NotFoundPage ->
