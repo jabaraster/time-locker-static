@@ -1,4 +1,4 @@
-module Index exposing (..)
+module Index exposing (Model, Msg(..), Page(..), PageForParser(..), characterImageUrl, characterSummaryReloader, checkbox, checkboxMode, checkboxOrder, checkboxProperty, convPage, enumParser, formatComma, gameModeToSortQueryString, init, isLoading, loadingIcon, main, parseUrl, reloadButton, sortCharacters, sortCore, sortOrderToQueryString, sortPropertyToQueryString, sortStateQueryParser, sortStateToQueryString, subscriptions, tagHighScore, tagScore, turnOverOrder, update, view, viewArmament, viewCharacterList, viewCharacterSummary, viewCharacterSummaryCore, viewDashboard, viewDashboardHeader, viewHeader, viewNotFound, viewScoreRank, viewScoreRanking, viewScoreSummary)
 
 import Api
 import Browser exposing (Document, UrlRequest)
@@ -11,6 +11,7 @@ import Http
 import Json.Decode
 import List.Extra as LE
 import List.Split as LS
+import Maybe.Extra as ME
 import RemoteResource as RR exposing (RemoteResource)
 import Set
 import Task
@@ -64,18 +65,20 @@ type alias Model =
     , page : Page
     , characters : RemoteResource CharacterList
     , charactersSortState : SortState
+    , totalPlayState : RemoteResource TotalPlayState
     , characterSummaryList : Dict CharacterName (RemoteResource CharacterSummary)
     }
 
 
 type Msg
-    = None
-    | LinkClicked Browser.UrlRequest
+    = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | CharacterListLoaded (Result Http.Error CharacterList)
     | LoadCharacterList
     | GetCharacterListLoadedTime Time.Posix
     | CharactersSortStateChanged SortState
+    | TotalPlayStateLoaded (Result Http.Error TotalPlayState)
+    | LoadTotalPlayState
     | CharacterSummaryLoaded CharacterName (Result Http.Error CharacterSummary)
     | LoadCharacterSummary CharacterName
 
@@ -88,9 +91,10 @@ init _ url key =
 
         model =
             { key = key
-            , characters = RR.empty
             , page = convPage page
+            , characters = RR.empty
             , charactersSortState = initialSortState
+            , totalPlayState = RR.empty
             , characterSummaryList = Dict.empty
             }
     in
@@ -99,8 +103,9 @@ init _ url key =
             ( { model
                 | characters = RR.startLoading model.characters
                 , charactersSortState = sortState
+                , totalPlayState = RR.startLoading model.totalPlayState
               }
-            , Api.getCharacterList CharacterListLoaded
+            , Cmd.batch [ Api.getCharacterList CharacterListLoaded, Api.getTotalPlayState TotalPlayStateLoaded ]
             )
 
         NotFoundPageW ->
@@ -202,9 +207,6 @@ sortOrderToQueryString v =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        None ->
-            ( model, Cmd.none )
-
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
@@ -223,18 +225,22 @@ update msg model =
             in
             case newModel.page of
                 DashboardPage ->
-                    case model.characters.data of
-                        Nothing ->
-                            let
-                                cs =
-                                    model.characters
-                            in
-                            ( { newModel | characters = { cs | loading = True } }
-                            , Api.getCharacterList CharacterListLoaded
-                            )
+                    let
+                        ( cs, mCsCmd ) =
+                            RR.loadIfNecessary model.characters (Api.getCharacterList CharacterListLoaded)
 
-                        Just _ ->
-                            ( newModel, Cmd.none )
+                        ( tp, mTpCmd ) =
+                            RR.loadIfNecessary model.totalPlayState (Api.getTotalPlayState TotalPlayStateLoaded)
+
+                        cmds =
+                            Cmd.batch <| ME.values [ mCsCmd, mTpCmd ]
+                    in
+                    ( { newModel
+                        | characters = cs
+                        , totalPlayState = tp
+                      }
+                    , cmds
+                    )
 
                 NotFoundPage ->
                     ( newModel, Cmd.none )
@@ -299,6 +305,19 @@ update msg model =
                       }
                     , cmd
                     )
+
+        TotalPlayStateLoaded res ->
+            case res of
+                Err _ ->
+                    ( { model | totalPlayState = RR.updateData model.totalPlayState res }, Cmd.none )
+
+                Ok s ->
+                    ( { model | totalPlayState = RR.updateSuccessData model.totalPlayState s }, Cmd.none )
+
+        LoadTotalPlayState ->
+            ( { model | totalPlayState = RR.startLoading model.totalPlayState }
+            , Api.getTotalPlayState TotalPlayStateLoaded
+            )
 
         CharacterSummaryLoaded characterName res ->
             case Dict.get characterName model.characterSummaryList of
@@ -381,7 +400,10 @@ viewDashboard model =
     , body =
         [ viewHeader
         , div [ class "container dashboard" ] <|
-            viewCharacterList model.characters model.charactersSortState
+            []
+                ++ viewTotalPlayState model.totalPlayState
+                ++ [ hr [] [] ]
+                ++ viewCharacterList model.characters model.charactersSortState
         ]
     }
 
@@ -390,8 +412,7 @@ viewCharacterSummary : Model -> CharacterName -> Maybe (RemoteResource Character
 viewCharacterSummary model characterName mResource =
     { title = characterName ++ " Summary"
     , body =
-        [ div [ class "backdrop-container" ] <| (viewDashboard model).body ++ [ div [ class "backdrop" ] [] ]
-        , div [ class "container character-summary" ] <|
+        [ div [ class "container character-summary" ] <|
             [ header [] [ a [ href "/" ] [ text "< Back to Dashboard" ] ]
             , img [ src <| characterImageUrl characterName 660 460, class "character" ] []
             , h3 [] <| span [ class "character-name" ] [ text characterName ] :: characterSummaryReloader characterName mResource
@@ -478,21 +499,65 @@ viewArmament arm =
 
 viewScoreSummary : CharacterSummary -> Html Msg
 viewScoreSummary summary =
+    viewScoreSummaryCore (Maybe.map .scoreSummary summary.hard) (Maybe.map .scoreSummary summary.normal)
+
+
+
+--    let
+--        mHardSummary =
+--            summary.hard
+--
+--        mNormalSummary =
+--            summary.normal
+--
+--        playCountMapper =
+--            \sum -> formatComma sum.scoreSummary.playCount
+--
+--        highScoreMapper =
+--            \sum -> formatComma sum.scoreSummary.highScore
+--
+--        averageScoreMapper =
+--            \sum -> formatComma <| round sum.scoreSummary.averageScore
+--    in
+--    table [ class "score-table score-summary-container" ]
+--        [ thead []
+--            [ tr []
+--                [ th [] []
+--                , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
+--                , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
+--                ]
+--            ]
+--        , tbody []
+--            [ tr []
+--                [ th [] [ text "Play count" ]
+--                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardSummary ]
+--                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalSummary ]
+--                ]
+--            , tr []
+--                [ th [] [ text "High score" ]
+--                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mHardSummary ]
+--                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mNormalSummary ]
+--                ]
+--            , tr []
+--                [ th [] [ text "Average score" ]
+--                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mHardSummary ]
+--                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mNormalSummary ]
+--                ]
+--            ]
+--        ]
+
+
+viewScoreSummaryCore : Maybe ScoreData -> Maybe ScoreData -> Html Msg
+viewScoreSummaryCore mHardScore mNormalScore =
     let
-        mHardSummary =
-            summary.hard
-
-        mNormalSummary =
-            summary.normal
-
         playCountMapper =
-            \sum -> formatComma sum.scoreSummary.playCount
+            formatComma << .playCount
 
         highScoreMapper =
-            \sum -> formatComma sum.scoreSummary.highScore
+            formatComma << .highScore
 
         averageScoreMapper =
-            \sum -> formatComma <| round sum.scoreSummary.averageScore
+            formatComma << round << .averageScore
     in
     table [ class "score-table score-summary-container" ]
         [ thead []
@@ -505,18 +570,18 @@ viewScoreSummary summary =
         , tbody []
             [ tr []
                 [ th [] [ text "Play count" ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardSummary ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalSummary ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardScore ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalScore ]
                 ]
             , tr []
                 [ th [] [ text "High score" ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mHardSummary ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mNormalSummary ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mHardScore ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mNormalScore ]
                 ]
             , tr []
                 [ th [] [ text "Average score" ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mHardSummary ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mNormalSummary ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mHardScore ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map averageScoreMapper mNormalScore ]
                 ]
             ]
         ]
@@ -567,21 +632,40 @@ viewDashboardHeader =
         ]
 
 
-viewCharacterList : RemoteResource CharacterList -> SortState -> List (Html Msg)
-viewCharacterList characters sortState =
-    case characters.data of
+viewTotalPlayState : RemoteResource TotalPlayState -> List (Html Msg)
+viewTotalPlayState rr =
+    let
+        fixParts =
+            h3 [] [ text "Total play state", reloadButton rr.loading LoadTotalPlayState ]
+    in
+    case rr.data of
         Nothing ->
-            [ h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
-            , span [] [ text "Now loading..." ]
-            ]
+            [ fixParts, span [] [ text "Now loading..." ] ]
 
         Just (Err _) ->
-            [ h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
-            , span [] [ text "Fail loading characters..." ]
+            [ fixParts, span [] [ text "Fail loading characters..." ] ]
+
+        Just (Ok totalPlayScore) ->
+            [ fixParts
+            , viewScoreSummaryCore (Just totalPlayScore.hard) (Just totalPlayScore.normal)
             ]
 
-        Just (Ok cs) ->
+
+viewCharacterList : RemoteResource CharacterList -> SortState -> List (Html Msg)
+viewCharacterList characters sortState =
+    let
+        fixParts =
             h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
+    in
+    case characters.data of
+        Nothing ->
+            [ fixParts, span [] [ text "Now loading..." ] ]
+
+        Just (Err _) ->
+            [ fixParts, span [] [ text "Fail loading characters..." ] ]
+
+        Just (Ok cs) ->
+            fixParts
                 :: div []
                     [ span [ class "character-count" ] [ text <| String.fromInt <| List.length cs ]
                     , span [] [ text " characters." ]

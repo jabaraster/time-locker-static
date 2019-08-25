@@ -1,4 +1,4 @@
-module RemoteResource exposing (..)
+module RemoteResource exposing (RemoteResource, empty, emptyLoading, finishLoading, hasData, loadIfNecessary, new, resourceValue, startLoading, updateData, updateLastLoadedTime, updateSuccessData)
 
 import Http
 import Time
@@ -67,3 +67,13 @@ updateLastLoadedTime rr newTime =
 hasData : RemoteResource a -> Bool
 hasData =
     Maybe.withDefault False << Maybe.map (\_ -> True) << .data
+
+
+loadIfNecessary : RemoteResource a -> Cmd msg -> ( RemoteResource a, Maybe (Cmd msg) )
+loadIfNecessary rr cmd =
+    case rr.data of
+        Just _ ->
+            ( rr, Nothing )
+
+        Nothing ->
+            ( { rr | loading = True }, Just cmd )

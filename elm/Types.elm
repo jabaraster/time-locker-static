@@ -1,4 +1,4 @@
-module Types exposing (..)
+module Types exposing (Armament, CharacterList, CharacterListElement, CharacterName, CharacterScoreRanking, CharacterSummary, CharacterSummaryElement, GameMode(..), PlayResult, ScoreData, ScoreRanking, SortOrder(..), SortProperty(..), SortState, TotalPlayState, armamentDecoder, characterListDecoder, characterListElementDecoder, characterSummaryDecoder, characterSummaryElementDecoder, emptyCharacterSummary, getScoreForMode, initialSortState, playResultDecoder, scoreDataDecoder, totalPlayStateDecoder)
 
 import Json.Decode as D
 
@@ -172,6 +172,8 @@ type alias TotalPlayState =
     }
 
 
-
--- totalPlayStateDecoder : D.Decoder TotalPlayState
--- totalPlayStateDecoder =
+totalPlayStateDecoder : D.Decoder TotalPlayState
+totalPlayStateDecoder =
+    D.map2 TotalPlayState
+        (D.field "hard" scoreDataDecoder)
+        (D.field "normal" scoreDataDecoder)

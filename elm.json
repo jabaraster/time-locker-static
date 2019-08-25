@@ -14,7 +14,8 @@
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
             "elm-community/list-extra": "8.2.2",
-            "elm-community/list-split": "1.0.3"
+            "elm-community/list-split": "1.0.3",
+            "elm-community/maybe-extra": "5.0.0"
         },
         "indirect": {
             "elm/bytes": "1.0.8",
