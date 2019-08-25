@@ -164,3 +164,14 @@ characterSummaryDecoder =
         (D.field "character" D.string)
         (D.maybe <| D.field "normal" characterSummaryElementDecoder)
         (D.maybe <| D.field "hard" characterSummaryElementDecoder)
+
+
+type alias TotalPlayState =
+    { hard : ScoreData
+    , normal : ScoreData
+    }
+
+
+
+-- totalPlayStateDecoder : D.Decoder TotalPlayState
+-- totalPlayStateDecoder =

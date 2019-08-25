@@ -54,24 +54,36 @@ table.character-list {
  ************************/
 @media (min-height: 801px) {
     .character-summary {
-       img.character {
-           width: 350px;
-           height: 373px;
-           object-fit: none;
-           object-position: 0 0;
-       }
+        img.character {
+            width: 350px;
+            height: 373px;
+            object-fit: none;
+            object-position: 0 0;
+        }
     }
 }
 @media (max-height: 800px) {
     .character-summary {
-       img.character {
-           width: 250px;
-           height: 135px;
-           object-fit: cover;
-           object-position: 0 0;
-       }
+        img.character {
+            width: 250px;
+            height: 135px;
+            object-fit: cover;
+            object-position: 0 0;
+        }
     }
- }
+}
+.character-summary {
+    margin: 1em;
+    padding: .5em;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: scroll;
+    border-radius: 4px;
+    background-color: rgba(255,255,255,1);
+}
 table.score-summary-container {
     max-width: 480px;
 }
@@ -148,6 +160,28 @@ ul {
 th {
     word-break: break-all;
 }
+.backdrop-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: scroll;
+}
+.backdrop {
+    background-color: rgba(0,0,0,.6);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+header > h1 {
+    > a, a:visited, a:hover {
+        color: @theme-color;
+        text-decoration-line: none;
+    }
+}
 h1, h2, h3 {
     color: @theme-color;
     font-weight: bold;
@@ -202,9 +236,9 @@ div.character-image-container, div.character-image-container-floating {
     color: @theme-color;
     margin: 10px;
     padding: 4px;
-    background-color: rgba(255,255,255,.6);
     border-radius: 50%;
     right: 0;
+    z-index: 1000;
 }
 /* https://on-ze.com/archives/510 より */
 .loading {

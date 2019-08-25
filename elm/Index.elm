@@ -361,25 +361,37 @@ view model =
                     viewNotFound model
 
                 CharacterSummaryPage name ->
-                    viewCharacterSummary name <| Dict.get name model.characterSummaryList
+                    viewCharacterSummary model name <| Dict.get name model.characterSummaryList
 
         loading =
             if isLoading model then
                 [ span [ class "fas fa-spinner loading loading-icon" ] [] ]
 
             else
-                [ span [ class "fas fa-spinner loading loading-icon hide" ] [] ]
+                []
     in
-    { title = doc.title ++ " | Jabara's Time Locker Analyzing"
+    { title = doc.title ++ " | Jabara's Time Locker play result"
     , body = loading ++ doc.body
     }
 
 
-viewCharacterSummary : CharacterName -> Maybe (RemoteResource CharacterSummary) -> Document Msg
-viewCharacterSummary characterName mResource =
+viewDashboard : Model -> Document Msg
+viewDashboard model =
+    { title = "Dashboard"
+    , body =
+        [ viewHeader
+        , div [ class "container dashboard" ] <|
+            viewCharacterList model.characters model.charactersSortState
+        ]
+    }
+
+
+viewCharacterSummary : Model -> CharacterName -> Maybe (RemoteResource CharacterSummary) -> Document Msg
+viewCharacterSummary model characterName mResource =
     { title = characterName ++ " Summary"
     , body =
-        [ div [ class "container character-summary" ] <|
+        [ div [ class "backdrop-container" ] <| (viewDashboard model).body ++ [ div [ class "backdrop" ] [] ]
+        , div [ class "container character-summary" ] <|
             [ header [] [ a [ href "/" ] [ text "< Back to Dashboard" ] ]
             , img [ src <| characterImageUrl characterName 660 460, class "character" ] []
             , h3 [] <| span [ class "character-name" ] [ text characterName ] :: characterSummaryReloader characterName mResource
@@ -540,16 +552,9 @@ checkboxProperty labelText sortState property =
     checkbox labelText (sortState.property == property) <| CharactersSortStateChanged { sortState | property = property }
 
 
-viewDashboard : Model -> Document Msg
-viewDashboard model =
-    { title = "Dashboard"
-    , body =
-        [ div [ class "container" ] <|
-            viewDashboardHeader
-                :: hr [] []
-                :: viewCharacterList model.characters model.charactersSortState
-        ]
-    }
+viewHeader : Html Msg
+viewHeader =
+    header [] [ h1 [] [ a [ href "/" ] [ text "Time Locker play result" ] ] ]
 
 
 viewDashboardHeader : Html Msg
