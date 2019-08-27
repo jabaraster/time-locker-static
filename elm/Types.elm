@@ -20,6 +20,20 @@ type GameMode
     | Normal
 
 
+gameModeDecoder : D.Decoder GameMode
+gameModeDecoder =
+    D.andThen
+        (\s ->
+            case String.toUpper s of
+                "HARD" ->
+                    D.succeed Hard
+
+                _ ->
+                    D.succeed Normal
+        )
+        D.string
+
+
 type SortProperty
     = HighScore
     | AverageScore
@@ -106,7 +120,9 @@ scoreDataDecoder =
 
 
 type alias PlayResult =
-    { score : Int
+    { character : CharacterName
+    , mode : GameMode
+    , score : Int
     , armaments : List Armament
     , reasons : List String
     , playTime : String
@@ -115,7 +131,9 @@ type alias PlayResult =
 
 playResultDecoder : D.Decoder PlayResult
 playResultDecoder =
-    D.map4 PlayResult
+    D.map6 PlayResult
+        (D.field "character" D.string)
+        (D.field "mode" gameModeDecoder)
         (D.field "score" D.int)
         (D.field "armaments" <| D.list armamentDecoder)
         (D.field "reasons" <| D.list D.string)
@@ -135,51 +153,17 @@ characterSummaryElementDecoder =
         (D.field "scoreRanking" <| D.list playResultDecoder)
 
 
-type alias CharacterScoreRanking =
-    { created : String
-    , character : CharacterName
-    , mode : GameMode
-    , score : Int
-    , scoreRank : Int
-    , armaments : List Armament
-    , reasons : List String
-    }
-
-
-characterScoreRankingDecoder : D.Decoder CharacterScoreRanking
-characterScoreRankingDecoder =
-    D.map7 CharacterScoreRanking
-        (D.field "created" D.string)
-        (D.field "character" D.string)
-        (D.field "mode" <|
-            D.andThen
-                (\s ->
-                    case String.toUpper s of
-                        "HARD" ->
-                            D.succeed Hard
-
-                        _ ->
-                            D.succeed Normal
-                )
-                D.string
-        )
-        (D.field "score" D.int)
-        (D.field "scoreRank" D.int)
-        (D.field "armaments" <| D.list armamentDecoder)
-        (D.field "reasons" <| D.list D.string)
-
-
 type alias ScoreRanking =
-    { hard : List CharacterScoreRanking
-    , normal : List CharacterScoreRanking
+    { hard : List PlayResult
+    , normal : List PlayResult
     }
 
 
 scoreRankingDecoder : D.Decoder ScoreRanking
 scoreRankingDecoder =
     D.map2 ScoreRanking
-        (D.field "hard" <| D.list characterScoreRankingDecoder)
-        (D.field "normal" <| D.list characterScoreRankingDecoder)
+        (D.field "hard" <| D.list playResultDecoder)
+        (D.field "normal" <| D.list playResultDecoder)
 
 
 type alias CharacterSummary =

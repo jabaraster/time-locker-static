@@ -1,4 +1,4 @@
-module Index exposing (Model, Msg(..), Page(..), PageForParser(..), characterImageUrl, characterSummaryReloader, checkbox, checkboxMode, checkboxOrder, checkboxProperty, convPage, enumParser, formatComma, gameModeToSortQueryString, init, isLoading, loadingIcon, main, parseUrl, reloadButton, sortCharacters, sortCore, sortOrderToQueryString, sortPropertyToQueryString, sortStateQueryParser, sortStateToQueryString, subscriptions, tagHighScore, tagScore, turnOverOrder, update, view, viewArmament, viewCharacterList, viewCharacterSummary, viewCharacterSummaryCore, viewDashboard, viewDashboardHeader, viewHeader, viewNotFound, viewScoreRank, viewScoreRanking, viewScoreSummary)
+module Index exposing (..)
 
 import Api
 import Browser exposing (Document, UrlRequest)
@@ -66,6 +66,7 @@ type alias Model =
     , characters : RemoteResource CharacterList
     , charactersSortState : SortState
     , totalPlayState : RemoteResource TotalPlayState
+    , scoreRanking : RemoteResource ScoreRanking
     , characterSummaryList : Dict CharacterName (RemoteResource CharacterSummary)
     }
 
@@ -79,6 +80,8 @@ type Msg
     | CharactersSortStateChanged SortState
     | TotalPlayStateLoaded (Result Http.Error TotalPlayState)
     | LoadTotalPlayState
+    | ScoreRankingLoaded (Result Http.Error ScoreRanking)
+    | LoadScoreRanking
     | CharacterSummaryLoaded CharacterName (Result Http.Error CharacterSummary)
     | LoadCharacterSummary CharacterName
 
@@ -95,6 +98,7 @@ init _ url key =
             , characters = RR.empty
             , charactersSortState = initialSortState
             , totalPlayState = RR.empty
+            , scoreRanking = RR.empty
             , characterSummaryList = Dict.empty
             }
     in
@@ -104,8 +108,13 @@ init _ url key =
                 | characters = RR.startLoading model.characters
                 , charactersSortState = sortState
                 , totalPlayState = RR.startLoading model.totalPlayState
+                , scoreRanking = RR.startLoading model.scoreRanking
               }
-            , Cmd.batch [ Api.getCharacterList CharacterListLoaded, Api.getTotalPlayState TotalPlayStateLoaded ]
+            , Cmd.batch
+                [ Api.getCharacterList CharacterListLoaded
+                , Api.getTotalPlayState TotalPlayStateLoaded
+                , Api.getScoreRanking ScoreRankingLoaded
+                ]
             )
 
         NotFoundPageW ->
@@ -231,12 +240,16 @@ update msg model =
 
                         ( tp, mTpCmd ) =
                             RR.loadIfNecessary model.totalPlayState (Api.getTotalPlayState TotalPlayStateLoaded)
+
+                        ( sr, mSrCmd ) =
+                            RR.loadIfNecessary model.scoreRanking (Api.getScoreRanking ScoreRankingLoaded)
                     in
                     ( { newModel
                         | characters = cs
                         , totalPlayState = tp
+                        , scoreRanking = sr
                       }
-                    , Cmd.batch <| ME.values [ mCsCmd, mTpCmd ]
+                    , Cmd.batch <| ME.values [ mCsCmd, mTpCmd, mSrCmd ]
                     )
 
                 NotFoundPage ->
@@ -316,6 +329,19 @@ update msg model =
             , Api.getTotalPlayState TotalPlayStateLoaded
             )
 
+        ScoreRankingLoaded res ->
+            case res of
+                Err _ ->
+                    ( { model | scoreRanking = RR.updateData model.scoreRanking res }, Cmd.none )
+
+                Ok s ->
+                    ( { model | scoreRanking = RR.updateSuccessData model.scoreRanking s }, Cmd.none )
+
+        LoadScoreRanking ->
+            ( { model | scoreRanking = RR.startLoading model.scoreRanking }
+            , Api.getScoreRanking ScoreRankingLoaded
+            )
+
         CharacterSummaryLoaded characterName res ->
             case Dict.get characterName model.characterSummaryList of
                 Nothing ->
@@ -393,6 +419,8 @@ viewDashboard model =
             []
                 ++ viewTotalPlayState model.totalPlayState
                 ++ [ hr [] [] ]
+                ++ viewScoreRanking model.scoreRanking
+                ++ [ hr [] [] ]
                 ++ viewCharacterList model.characters model.charactersSortState
         ]
     }
@@ -449,13 +477,13 @@ viewCharacterSummaryCore characterName rr =
         Just (Ok data) ->
             [ viewScoreSummary data
             , h1 [] [ text "Score ranking" ]
-            , viewScoreRanking "Hard" data.hard
-            , viewScoreRanking "Normal" data.normal
+            , viewCharacterScoreRanking "Hard" data.hard
+            , viewCharacterScoreRanking "Normal" data.normal
             ]
 
 
-viewScoreRanking : String -> Maybe CharacterSummaryElement -> Html Msg
-viewScoreRanking mode mSummary =
+viewCharacterScoreRanking : String -> Maybe CharacterSummaryElement -> Html Msg
+viewCharacterScoreRanking mode mSummary =
     case mSummary of
         Nothing ->
             div [ class "score-ranking-container" ]
@@ -465,18 +493,32 @@ viewScoreRanking mode mSummary =
 
         Just summary ->
             div [ class "score-ranking-container" ] <|
-                [ h3 [] [ text mode ] ]
-                    ++ List.map viewScoreRank summary.scoreRanking
+                h3 [] [ text mode ]
+                    :: List.map viewPlayResult summary.scoreRanking
 
 
-viewScoreRank : PlayResult -> Html Msg
-viewScoreRank rank =
-    div [ class "score-rank-container" ]
-        [ span [ class "score-label" ] [ text "Score: " ]
-        , span [ class "score" ] [ text <| formatComma rank.score ]
-        , span [ class "play-time" ] [ text <| String.replace "T" " " <| String.dropRight 8 <| rank.playTime ]
-        , div [ class "armaments-container" ] <| List.map viewArmament rank.armaments
-        ]
+viewPlayResult : PlayResult -> Html Msg
+viewPlayResult result =
+    div [ class "score-rank-container" ] <| playResultHtmls result
+
+
+viewPlayResultWithCharacterImage : PlayResult -> Html Msg
+viewPlayResultWithCharacterImage result =
+    div [ class "score-rank-container" ] <|
+        div [ class "character-image-container" ]
+            [ img [ src <| characterImageUrl result.character 65 65, alt result.character, class "character" ] []
+            , span [ class "character-name" ] [ text result.character ]
+            ]
+            :: playResultHtmls result
+
+
+playResultHtmls : PlayResult -> List (Html Msg)
+playResultHtmls result =
+    [ span [ class "score-label" ] [ text "Score: " ]
+    , span [ class "score" ] [ text <| formatComma result.score ]
+    , span [ class "play-time" ] [ text <| String.replace "T" " " <| String.dropRight 8 <| result.playTime ]
+    , div [ class "armaments-container" ] <| List.map viewArmament result.armaments
+    ]
 
 
 viewArmament : Armament -> Html Msg
@@ -593,6 +635,30 @@ viewTotalPlayState rr =
         Just (Ok totalPlayScore) ->
             [ fixParts
             , viewScoreSummaryCore (Just totalPlayScore.hard) (Just totalPlayScore.normal)
+            ]
+
+
+viewScoreRanking : RemoteResource ScoreRanking -> List (Html Msg)
+viewScoreRanking rr =
+    let
+        fixParts =
+            h3 [] [ text "Score ranking", reloadButton rr.loading LoadScoreRanking ]
+    in
+    case rr.data of
+        Nothing ->
+            [ fixParts, span [] [ text "Now loading..." ] ]
+
+        Just (Err _) ->
+            [ fixParts, span [] [ text "Fail loading characters..." ] ]
+
+        Just (Ok scoreRanking) ->
+            [ fixParts
+            , div [ class "score-ranking-container" ] <|
+                h4 [] [ text "Hard" ]
+                    :: (List.map viewPlayResultWithCharacterImage <| List.take 5 scoreRanking.hard)
+            , div [ class "score-ranking-container" ] <|
+                h4 [] [ text "Normal" ]
+                    :: (List.map viewPlayResultWithCharacterImage <| List.take 5 scoreRanking.normal)
             ]
 
 
