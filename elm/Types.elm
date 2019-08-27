@@ -1,4 +1,4 @@
-module Types exposing (Armament, CharacterList, CharacterListElement, CharacterName, CharacterScoreRanking, CharacterSummary, CharacterSummaryElement, GameMode(..), PlayResult, ScoreData, ScoreRanking, SortOrder(..), SortProperty(..), SortState, TotalPlayState, armamentDecoder, characterListDecoder, characterListElementDecoder, characterSummaryDecoder, characterSummaryElementDecoder, emptyCharacterSummary, getScoreForMode, initialSortState, playResultDecoder, scoreDataDecoder, totalPlayStateDecoder)
+module Types exposing (..)
 
 import Json.Decode as D
 import Maybe.Extra as ME
@@ -146,10 +146,40 @@ type alias CharacterScoreRanking =
     }
 
 
+characterScoreRankingDecoder : D.Decoder CharacterScoreRanking
+characterScoreRankingDecoder =
+    D.map7 CharacterScoreRanking
+        (D.field "created" D.string)
+        (D.field "character" D.string)
+        (D.field "mode" <|
+            D.andThen
+                (\s ->
+                    case String.toUpper s of
+                        "HARD" ->
+                            D.succeed Hard
+
+                        _ ->
+                            D.succeed Normal
+                )
+                D.string
+        )
+        (D.field "score" D.int)
+        (D.field "scoreRank" D.int)
+        (D.field "armaments" <| D.list armamentDecoder)
+        (D.field "reasons" <| D.list D.string)
+
+
 type alias ScoreRanking =
     { hard : List CharacterScoreRanking
     , normal : List CharacterScoreRanking
     }
+
+
+scoreRankingDecoder : D.Decoder ScoreRanking
+scoreRankingDecoder =
+    D.map2 ScoreRanking
+        (D.field "hard" <| D.list characterScoreRankingDecoder)
+        (D.field "normal" <| D.list characterScoreRankingDecoder)
 
 
 type alias CharacterSummary =

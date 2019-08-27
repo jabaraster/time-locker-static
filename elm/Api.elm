@@ -27,3 +27,11 @@ getTotalPlayState operation =
         { url = "/api/total-play-state/"
         , expect = Http.expectJson operation totalPlayStateDecoder
         }
+
+
+getScoreRanking : (Result Http.Error ScoreRanking -> msg) -> Cmd msg
+getScoreRanking operation =
+    Http.get
+        { url = "/api/score-ranking/"
+        , expect = Http.expectJson operation scoreRankingDecoder
+        }
