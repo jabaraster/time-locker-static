@@ -68,6 +68,7 @@ type alias Model =
     , totalPlayState : RemoteResource TotalPlayState
     , scoreRanking : RemoteResource ScoreRanking
     , characterSummaryList : Dict CharacterName (RemoteResource CharacterSummary)
+    , dailyPlaySummaryList : RemoteResource DailyPlaySummaryList
     }
 
 
@@ -84,6 +85,8 @@ type Msg
     | LoadScoreRanking
     | CharacterSummaryLoaded CharacterName (Result Http.Error CharacterSummary)
     | LoadCharacterSummary CharacterName
+    | DailyPlaySummaryListLoaded (Result Http.Error DailyPlaySummaryList)
+    | LoadDailyPlaySummaryList
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -100,6 +103,7 @@ init _ url key =
             , totalPlayState = RR.empty
             , scoreRanking = RR.empty
             , characterSummaryList = Dict.empty
+            , dailyPlaySummaryList = RR.empty
             }
     in
     case page of
@@ -109,11 +113,13 @@ init _ url key =
                 , charactersSortState = sortState
                 , totalPlayState = RR.startLoading model.totalPlayState
                 , scoreRanking = RR.startLoading model.scoreRanking
+                , dailyPlaySummaryList = RR.startLoading model.dailyPlaySummaryList
               }
             , Cmd.batch
                 [ Api.getCharacterList CharacterListLoaded
                 , Api.getTotalPlayState TotalPlayStateLoaded
                 , Api.getScoreRanking ScoreRankingLoaded
+                , Api.getDailyPlaySummaryList DailyPlaySummaryListLoaded
                 ]
             )
 
@@ -371,6 +377,19 @@ update msg model =
                     ( { model | characterSummaryList = Dict.update characterName (Maybe.map RR.startLoading) model.characterSummaryList }
                     , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
                     )
+
+        DailyPlaySummaryListLoaded res ->
+            case res of
+                Err _ ->
+                    ( { model | dailyPlaySummaryList = RR.updateData model.dailyPlaySummaryList res }, Cmd.none )
+
+                Ok s ->
+                    ( { model | dailyPlaySummaryList = RR.updateSuccessData model.dailyPlaySummaryList s }, Cmd.none )
+
+        LoadDailyPlaySummaryList ->
+            ( { model | dailyPlaySummaryList = RR.startLoading model.dailyPlaySummaryList }
+            , Api.getDailyPlaySummaryList DailyPlaySummaryListLoaded
+            )
 
 
 subscriptions : Model -> Sub Msg

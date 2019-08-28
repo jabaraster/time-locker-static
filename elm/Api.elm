@@ -35,3 +35,11 @@ getScoreRanking operation =
         { url = "/api/score-ranking/"
         , expect = Http.expectJson operation scoreRankingDecoder
         }
+
+
+getDailyPlaySummaryList : (Result Http.Error DailyPlaySummaryList -> msg) -> Cmd msg
+getDailyPlaySummaryList operation =
+    Http.get
+        { url = "/api/play-summary/daily"
+        , expect = Http.expectJson operation <| D.list dailyPlaySummaryDecoder
+        }

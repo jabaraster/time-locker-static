@@ -206,3 +206,31 @@ totalPlayStateDecoder =
     D.map2 TotalPlayState
         (D.field "hard" scoreDataDecoder)
         (D.field "normal" scoreDataDecoder)
+
+
+type alias DailyPlaySummary =
+    { playDate : String
+    , mode : GameMode
+    , playCount : Int
+    , highScore : Int
+    , averageScore : Float
+    }
+
+
+dailyPlaySummaryDecoder : D.Decoder DailyPlaySummary
+dailyPlaySummaryDecoder =
+    D.map5 DailyPlaySummary
+        (D.field "playDate" D.string)
+        (D.field "mode" gameModeDecoder)
+        (D.field "playCount" D.int)
+        (D.field "highScore" D.int)
+        (D.field "averageScore" D.float)
+
+
+type alias DailyPlaySummaryList =
+    List DailyPlaySummary
+
+
+dailyPlaySummaryListDecoder : D.Decoder DailyPlaySummaryList
+dailyPlaySummaryListDecoder =
+    D.list dailyPlaySummaryDecoder
