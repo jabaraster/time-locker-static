@@ -505,17 +505,19 @@ viewPlayResult result =
 viewPlayResultWithCharacterImage : PlayResult -> Html Msg
 viewPlayResultWithCharacterImage result =
     div [ class "score-rank-container" ] <|
-        div [ class "character-image-container" ]
-            [ img [ src <| characterImageUrl result.character 65 65, alt result.character, class "character" ] []
-            , span [ class "character-name" ] [ text result.character ]
+        a [ href <| "/character/" ++ result.character ]
+            [ div [ class "character-image-container" ]
+                [ img [ src <| characterImageUrl result.character 65 65, alt result.character, class "character" ] []
+                , span [ class "character-name" ] [ text result.character ]
+                ]
             ]
             :: playResultHtmls result
 
 
 playResultHtmls : PlayResult -> List (Html Msg)
 playResultHtmls result =
-    [ span [ class "score-label" ] [ text "Score: " ]
-    , span [ class "score" ] [ text <| formatComma result.score ]
+    [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
+    , span [ class <| "score " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text <| formatComma result.score ]
     , span [ class "play-time" ] [ text <| String.replace "T" " " <| String.dropRight 8 <| result.playTime ]
     , div [ class "armaments-container" ] <| List.map viewArmament result.armaments
     ]
@@ -623,7 +625,7 @@ viewTotalPlayState : RemoteResource TotalPlayState -> List (Html Msg)
 viewTotalPlayState rr =
     let
         fixParts =
-            h3 [] [ text "Total play state", reloadButton rr.loading LoadTotalPlayState ]
+            h2 [] [ text "Total play state", reloadButton rr.loading LoadTotalPlayState ]
     in
     case rr.data of
         Nothing ->
@@ -642,7 +644,7 @@ viewScoreRanking : RemoteResource ScoreRanking -> List (Html Msg)
 viewScoreRanking rr =
     let
         fixParts =
-            h3 [] [ text "Score ranking", reloadButton rr.loading LoadScoreRanking ]
+            h2 [] [ text "Score ranking", reloadButton rr.loading LoadScoreRanking ]
     in
     case rr.data of
         Nothing ->
@@ -654,10 +656,10 @@ viewScoreRanking rr =
         Just (Ok scoreRanking) ->
             [ fixParts
             , div [ class "score-ranking-container" ] <|
-                h4 [] [ text "Hard" ]
+                h3 [] [ text "Hard" ]
                     :: (List.map viewPlayResultWithCharacterImage <| List.take 5 scoreRanking.hard)
             , div [ class "score-ranking-container" ] <|
-                h4 [] [ text "Normal" ]
+                h3 [] [ text "Normal" ]
                     :: (List.map viewPlayResultWithCharacterImage <| List.take 5 scoreRanking.normal)
             ]
 
@@ -666,7 +668,7 @@ viewCharacterList : RemoteResource CharacterList -> SortState -> List (Html Msg)
 viewCharacterList characters sortState =
     let
         fixParts =
-            h3 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
+            h2 [] [ text "Character list", reloadButton characters.loading LoadCharacterList ]
     in
     case characters.data of
         Nothing ->

@@ -20,6 +20,16 @@ type GameMode
     | Normal
 
 
+gameModeToString : GameMode -> String
+gameModeToString mode =
+    case mode of
+        Hard ->
+            "Hard"
+
+        Normal ->
+            "Normal"
+
+
 gameModeDecoder : D.Decoder GameMode
 gameModeDecoder =
     D.andThen

@@ -73,16 +73,7 @@ table.character-list {
     }
 }
 .character-summary {
-    margin: 1em;
     padding: .5em;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: scroll;
-    border-radius: 4px;
-    background-color: rgba(255,255,255,1);
 }
 table.score-summary-container {
     max-width: 480px;
@@ -100,6 +91,9 @@ table.score-summary-container {
     }
     .play-time {
         padding-left: 10px;
+    }
+    .hard {
+        color: @theme-color;
     }
 }
 img.armament {
@@ -159,22 +153,6 @@ ul {
 }
 th {
     word-break: break-all;
-}
-.backdrop-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: scroll;
-}
-.backdrop {
-    background-color: rgba(0,0,0,.6);
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
 }
 header > h1 {
     > a, a:visited, a:hover {
