@@ -8,11 +8,16 @@ type alias CharacterName =
     String
 
 
-type alias CharacterListElement =
+type alias CharacterScore =
     { character : CharacterName
     , normal : Maybe ScoreData
     , hard : Maybe ScoreData
     }
+
+
+emptyCharacterScore : CharacterName -> CharacterScore
+emptyCharacterScore cn =
+    { character = cn, hard = Nothing, normal = Nothing }
 
 
 type GameMode
@@ -70,7 +75,7 @@ initialSortState =
     }
 
 
-getScoreForMode : GameMode -> CharacterListElement -> Maybe ScoreData
+getScoreForMode : GameMode -> CharacterScore -> Maybe ScoreData
 getScoreForMode mode =
     case mode of
         Hard ->
@@ -80,16 +85,16 @@ getScoreForMode mode =
             .normal
 
 
-characterListElementDecoder : D.Decoder CharacterListElement
+characterListElementDecoder : D.Decoder CharacterScore
 characterListElementDecoder =
-    D.map3 CharacterListElement
+    D.map3 CharacterScore
         (D.field "character" D.string)
         (D.maybe <| D.field "normal" scoreDataDecoder)
         (D.maybe <| D.field "hard" scoreDataDecoder)
 
 
 type alias CharacterList =
-    List CharacterListElement
+    List CharacterScore
 
 
 characterListDecoder : D.Decoder CharacterList

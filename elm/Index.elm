@@ -98,7 +98,7 @@ init _ url key =
         model =
             { key = key
             , page = convPage page
-            , characters = RR.empty
+            , characters = RR.updateSuccessData RR.empty <| List.map emptyCharacterScore characterNames
             , charactersSortState = initialSortState
             , totalPlayState = RR.empty
             , scoreRanking = RR.empty
@@ -732,7 +732,7 @@ viewCharacterList characters sortState =
                     cs
 
 
-tagScore : CharacterListElement -> Html.Html msg
+tagScore : CharacterScore -> Html.Html msg
 tagScore c =
     table [ class "score-table character-list" ]
         [ tbody [] <|
@@ -784,7 +784,7 @@ reloadButton loading handler =
         [ i [ classList [ ( "fas fa-sync", True ), ( "loading", loading ) ] ] [] ]
 
 
-sortCore : SortOrder -> (CharacterListElement -> number) -> CharacterList -> CharacterList
+sortCore : SortOrder -> (CharacterScore -> number) -> CharacterList -> CharacterList
 sortCore order comparator =
     case order of
         Ascendant ->
@@ -856,3 +856,88 @@ turnOverOrder order src =
 
         ( Descendant, LT ) ->
             GT
+
+
+characterNames =
+    [ "ACUTE WIDE LOCKER"
+    , "ALLIGATOR"
+    , "ALLO SAURUS"
+    , "ANT BEAR"
+    , "APPLIV WALKER"
+    , "AUTO AIM BOT"
+    , "AUTO ICE LASER"
+    , "BACK SHOOTER"
+    , "BACK SPRAY SHOOTER"
+    , "BEAM DRAGON"
+    , "BEAM PSYCHIC"
+    , "BEAM WALKER"
+    , "BIG LINE LOCKER"
+    , "BIO RIDER"
+    , "D RIFLE LOCKER"
+    , "DIFFUSER"
+    , "DIMETRODON"
+    , "DOUBLE SNIPER"
+    , "FARTER"
+    , "FLAP SNIPER"
+    , "FLAT LOCKER"
+    , "FREEZER"
+    , "GAME CAST"
+    , "GORI WRAP"
+    , "GREEN MARKER"
+    , "HOMING HOPPER"
+    , "HOMING ICE BOT"
+    , "HUMMER HEAD"
+    , "HUNTER KILLER"
+    , "HUSKY"
+    , "ICE BEAM LOCKER"
+    , "ICE LINE LOCKER"
+    , "ICE PTERANODON"
+    , "JUSTIN"
+    , "LAUNCHER"
+    , "LAUNCHER 2"
+    , "MAD LOCKER"
+    , "MINE DRIVER"
+    , "MINE LOCKER"
+    , "MINIGUN LOCKER"
+    , "MISSILE MASTER"
+    , "MISSILE MASTER 2"
+    , "MUCUS"
+    , "PANDA"
+    , "PEE RASCAL"
+    , "PENGUIN"
+    , "PLESIO SAUR"
+    , "PREDATOR"
+    , "PSYCHIC LOCKER"
+    , "PTERANODON"
+    , "QUAD LOCKER"
+    , "RIFLE LOCKER"
+    , "ROCKET LOCKER"
+    , "RODEO STAMPEDE I"
+    , "RODEO STAMPEDE Ⅱ"
+    , "SHIKIISHI LOCKER"
+    , "SIDE LOCKER"
+    , "SKATER"
+    , "SPEED-MSL DOG"
+    , "SPEED-RCT DIATRYMA"
+    , "SPRAY WALKER"
+    , "STEGO SAUR"
+    , "SUPPORTER BEAR"
+    , "T-REX"
+    , "THE DOG"
+    , "THE LOCKER"
+    , "TORTOISE"
+    , "TRACKER"
+    , "TRIKE"
+    , "TWINKIE DRONE"
+    , "WAR DRONE"
+    , "WAR FROG"
+    , "WAR MANMOTH"
+    , "WAR TOY"
+    , "WHALE"
+    , "WIDE BREAKER"
+    , "WIDE ICE LOCKER"
+    , "WIDE JUSTIN"
+    , "WIDE RHINO"
+    , "X-LASER"
+    , "X-SHOOTER"
+    ]
