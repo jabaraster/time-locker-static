@@ -1,29 +1,100 @@
-module Types exposing (Armament, CharacterList, CharacterListElement, CharacterName, CharacterSummary, CharacterSummaryElement, PlayResult, ScoreData, armamentDecoder, characterListDecoder, characterListElementDecoder, characterSummaryDecoder, characterSummaryElementDecoder, emptyCharacterSummary, playResultDecoder, scoreDataDecoder)
+module Types exposing (..)
 
 import Json.Decode as D
+import Maybe.Extra as ME
 
 
 type alias CharacterName =
     String
 
 
-type alias CharacterListElement =
+type alias CharacterScore =
     { character : CharacterName
     , normal : Maybe ScoreData
     , hard : Maybe ScoreData
     }
 
 
-characterListElementDecoder : D.Decoder CharacterListElement
+emptyCharacterScore : CharacterName -> CharacterScore
+emptyCharacterScore cn =
+    { character = cn, hard = Nothing, normal = Nothing }
+
+
+type GameMode
+    = Hard
+    | Normal
+
+
+gameModeToString : GameMode -> String
+gameModeToString mode =
+    case mode of
+        Hard ->
+            "Hard"
+
+        Normal ->
+            "Normal"
+
+
+gameModeDecoder : D.Decoder GameMode
+gameModeDecoder =
+    D.andThen
+        (\s ->
+            case String.toUpper s of
+                "HARD" ->
+                    D.succeed Hard
+
+                _ ->
+                    D.succeed Normal
+        )
+        D.string
+
+
+type SortProperty
+    = HighScore
+    | AverageScore
+    | Name
+    | PlayCount
+
+
+type SortOrder
+    = Ascendant
+    | Descendant
+
+
+type alias SortState =
+    { property : SortProperty
+    , mode : GameMode
+    , order : SortOrder
+    }
+
+
+initialSortState =
+    { property = Name
+    , mode = Hard
+    , order = Ascendant
+    }
+
+
+getScoreForMode : GameMode -> CharacterScore -> Maybe ScoreData
+getScoreForMode mode =
+    case mode of
+        Hard ->
+            .hard
+
+        Normal ->
+            .normal
+
+
+characterListElementDecoder : D.Decoder CharacterScore
 characterListElementDecoder =
-    D.map3 CharacterListElement
+    D.map3 CharacterScore
         (D.field "character" D.string)
         (D.maybe <| D.field "normal" scoreDataDecoder)
         (D.maybe <| D.field "hard" scoreDataDecoder)
 
 
 type alias CharacterList =
-    List CharacterListElement
+    List CharacterScore
 
 
 characterListDecoder : D.Decoder CharacterList
@@ -41,7 +112,11 @@ armamentDecoder : D.Decoder Armament
 armamentDecoder =
     D.map2 Armament
         (D.field "name" D.string)
-        (D.field "level" D.int)
+        (D.field "level"
+            (D.andThen (ME.unwrap (D.succeed 0) (\i -> D.succeed i))
+                (D.maybe D.int)
+            )
+        )
 
 
 type alias ScoreData =
@@ -60,7 +135,9 @@ scoreDataDecoder =
 
 
 type alias PlayResult =
-    { score : Int
+    { character : CharacterName
+    , mode : GameMode
+    , score : Int
     , armaments : List Armament
     , reasons : List String
     , playTime : String
@@ -69,8 +146,22 @@ type alias PlayResult =
 
 playResultDecoder : D.Decoder PlayResult
 playResultDecoder =
-    D.map4 PlayResult
-        (D.field "score" D.int)
+    D.map6 PlayResult
+        (D.field "character" D.string)
+        (D.field "mode" gameModeDecoder)
+        (D.andThen
+            (\mi ->
+                case mi of
+                    Nothing ->
+                        D.succeed 0
+
+                    Just i ->
+                        D.succeed i
+            )
+         <|
+            D.maybe <|
+                D.field "score" D.int
+        )
         (D.field "armaments" <| D.list armamentDecoder)
         (D.field "reasons" <| D.list D.string)
         (D.field "created" D.string)
@@ -89,10 +180,23 @@ characterSummaryElementDecoder =
         (D.field "scoreRanking" <| D.list playResultDecoder)
 
 
+type alias ScoreRanking =
+    { hard : List PlayResult
+    , normal : List PlayResult
+    }
+
+
+scoreRankingDecoder : D.Decoder ScoreRanking
+scoreRankingDecoder =
+    D.map2 ScoreRanking
+        (D.field "hard" <| D.list playResultDecoder)
+        (D.field "normal" <| D.list playResultDecoder)
+
+
 type alias CharacterSummary =
     { character : CharacterName
-    , normal : Maybe CharacterSummaryElement
     , hard : Maybe CharacterSummaryElement
+    , normal : Maybe CharacterSummaryElement
     }
 
 
@@ -104,5 +208,18 @@ characterSummaryDecoder : D.Decoder CharacterSummary
 characterSummaryDecoder =
     D.map3 CharacterSummary
         (D.field "character" D.string)
-        (D.maybe <| D.field "normal" characterSummaryElementDecoder)
         (D.maybe <| D.field "hard" characterSummaryElementDecoder)
+        (D.maybe <| D.field "normal" characterSummaryElementDecoder)
+
+
+type alias TotalPlayState =
+    { hard : ScoreData
+    , normal : ScoreData
+    }
+
+
+totalPlayStateDecoder : D.Decoder TotalPlayState
+totalPlayStateDecoder =
+    D.map2 TotalPlayState
+        (D.field "hard" scoreDataDecoder)
+        (D.field "normal" scoreDataDecoder)

@@ -5,25 +5,47 @@
 /************************
  * Dashboard
  ************************/
+.character-count {
+    color: @theme-color;
+    font-style: italic;
+    font-size: 150%;
+    font-weight: bold;
+}
 div.character-image-container-floating {
     margin: 2px;
     margin-bottom: 20px;
     display: inline-block;
 }
 table.character-list {
-    width: 100%;
     font-size: 80%;
     > tbody > tr > th, > tbody > tr > td {
         padding: 0;
     }
-    > tbody > tr > td {
-        text-align: right;
-    }
     tr.score-element {
-        border-bottom: @score-border-color;
         th {
             padding-left: .5em;
         }
+    }
+}
+.sort-parameter {
+    display: inline-block;
+    border: solid 1px @score-border-color;
+    border-radius: 2px;
+    padding: 2px;
+    margin-right: 1px;
+    margin-bottom: 1px;
+
+    label {
+        margin-right: 1em;
+        cursor: pointer;
+    }
+    .checked {
+        color: rgba(255,255,255,1);
+        background-color: rgba(30,100,30,1);
+        border-radius: 50%;
+    }
+    .unchecked {
+        color: rgba(150,150,150,1);
     }
 }
 
@@ -32,41 +54,46 @@ table.character-list {
  ************************/
 @media (min-height: 801px) {
     .character-summary {
-       img.character {
-           width: 350px;
-           height: 373px;
-           object-fit: none;
-           object-position: 0 0;
-       }
+        img.character {
+            width: 350px;
+            height: 373px;
+            object-fit: none;
+            object-position: 0 0;
+        }
     }
 }
 @media (max-height: 800px) {
     .character-summary {
-       img.character {
-           width: 250px;
-           height: 135px;
-           object-fit: cover;
-           object-position: 0 0;
-       }
+        img.character {
+            width: 250px;
+            height: 135px;
+            object-fit: cover;
+            object-position: 0 0;
+        }
     }
- }
+}
+.character-summary {
+    padding: .5em;
+}
 table.score-summary-container {
-    width: 100%;
     max-width: 480px;
-    tr {
-        border-bottom: solid 1px @score-border-color;
-    }
-    th, td {
-        padding-left: 1em;
-        padding-right: 1em;
-        padding-top: 5px;
-        padding-top: 5px;
-    }
 }
 .score-rank-container {
     margin-bottom: 10px;
-    td {
-        padding-left: 1em;
+    .score, .score-label {
+        font-size: 150%;
+        font-weight: bold;
+    }
+    .score {
+        display: inline-block;
+        width: 4.5em; 
+        text-align: right;
+    }
+    .play-time {
+        padding-left: 10px;
+    }
+    .hard {
+        color: @theme-color;
     }
 }
 img.armament {
@@ -81,21 +108,20 @@ img.armament {
     padding: 2px;
     margin-right: 1px;
     margin-bottom: 1px;
+    width: 70px;
 }
 .armament-level {
     font-weight: bold;
     font-style: italic;
-    padding-left: 1em;
     padding-right: 1em;
+    text-align: right;
+    float: right;
 }
 .character-summary-container {
     display: inline-block;
     margin: .5em;
     padding: .5em;
 
-    table tbody.summary tr {
-        border-bottom: solid 1px rgba(100,100,100,.6);
-    }
     table.armament-level-list {
         tbody tr.basic-play-result > * {
             padding-top: .5em;
@@ -119,19 +145,41 @@ img.armament {
 /************************
  * General
  ************************/
+body {
+    color: rgba(50,50,50,1);
+}
 ul {
     list-style: none;
 }
 th {
     word-break: break-all;
 }
-h1, h3 {
+header > h1 {
+    > a, a:visited, a:hover {
+        color: @theme-color;
+        text-decoration-line: none;
+    }
+}
+h1, h2, h3 {
     color: @theme-color;
     font-weight: bold;
     font-style: italic;
 }
 th.number, td.number {
     text-align: right;
+}
+table.score-table {
+    width: 100%;
+    tr {
+        border-bottom: solid 1px @score-border-color;
+    }
+    th, td {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+}
+button.reloader {
+    border: none;
 }
 .character-name {
     color: @theme-color;
@@ -166,9 +214,9 @@ div.character-image-container, div.character-image-container-floating {
     color: @theme-color;
     margin: 10px;
     padding: 4px;
-    background-color: rgba(255,255,255,.6);
     border-radius: 50%;
     right: 0;
+    z-index: 1000;
 }
 /* https://on-ze.com/archives/510 より */
 .loading {

@@ -1,4 +1,4 @@
-module RemoteResource exposing (RemoteResource, empty, finishLoading, new, resourceValue, startLoading, updateData, updateLastLoadedTime)
+module RemoteResource exposing (RemoteResource, empty, emptyLoading, finishLoading, hasData, loadIfNecessary, new, resourceValue, startLoading, updateData, updateLastLoadedTime, updateSuccessData)
 
 import Http
 import Time
@@ -14,6 +14,11 @@ type alias RemoteResource a =
 empty : RemoteResource a
 empty =
     { data = Nothing, loading = False, lastLoadedTime = Nothing }
+
+
+emptyLoading : RemoteResource a
+emptyLoading =
+    { empty | loading = True }
 
 
 new : Result Http.Error a -> RemoteResource a
@@ -39,6 +44,11 @@ updateData rr newData =
     { rr | data = Just newData, loading = False }
 
 
+updateSuccessData : RemoteResource a -> a -> RemoteResource a
+updateSuccessData rr newData =
+    { rr | data = Just <| Ok newData, loading = False }
+
+
 startLoading : RemoteResource a -> RemoteResource a
 startLoading rr =
     { rr | loading = True }
@@ -52,3 +62,18 @@ finishLoading rr =
 updateLastLoadedTime : RemoteResource a -> Time.Posix -> RemoteResource a
 updateLastLoadedTime rr newTime =
     { rr | lastLoadedTime = Just newTime }
+
+
+hasData : RemoteResource a -> Bool
+hasData =
+    Maybe.withDefault False << Maybe.map (\_ -> True) << .data
+
+
+loadIfNecessary : RemoteResource a -> Cmd msg -> ( RemoteResource a, Maybe (Cmd msg) )
+loadIfNecessary rr cmd =
+    case rr.data of
+        Just _ ->
+            ( rr, Nothing )
+
+        Nothing ->
+            ( { rr | loading = True }, Just cmd )
