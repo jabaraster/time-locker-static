@@ -149,7 +149,19 @@ playResultDecoder =
     D.map6 PlayResult
         (D.field "character" D.string)
         (D.field "mode" gameModeDecoder)
-        (D.field "score" D.int)
+        (D.andThen
+            (\mi ->
+                case mi of
+                    Nothing ->
+                        D.succeed 0
+
+                    Just i ->
+                        D.succeed i
+            )
+         <|
+            D.maybe <|
+                D.field "score" D.int
+        )
         (D.field "armaments" <| D.list armamentDecoder)
         (D.field "reasons" <| D.list D.string)
         (D.field "created" D.string)
@@ -183,8 +195,8 @@ scoreRankingDecoder =
 
 type alias CharacterSummary =
     { character : CharacterName
-    , normal : Maybe CharacterSummaryElement
     , hard : Maybe CharacterSummaryElement
+    , normal : Maybe CharacterSummaryElement
     }
 
 
@@ -196,8 +208,8 @@ characterSummaryDecoder : D.Decoder CharacterSummary
 characterSummaryDecoder =
     D.map3 CharacterSummary
         (D.field "character" D.string)
-        (D.maybe <| D.field "normal" characterSummaryElementDecoder)
         (D.maybe <| D.field "hard" characterSummaryElementDecoder)
+        (D.maybe <| D.field "normal" characterSummaryElementDecoder)
 
 
 type alias TotalPlayState =
