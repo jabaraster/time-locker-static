@@ -107,16 +107,11 @@ type alias Armament =
     , level : Int
     }
 
-
 armamentDecoder : D.Decoder Armament
 armamentDecoder =
     D.map2 Armament
         (D.field "name" D.string)
-        (D.field "level"
-            (D.andThen (ME.unwrap (D.succeed 0) (\i -> D.succeed i))
-                (D.maybe D.int)
-            )
-        )
+        (D.field "level" <| nvlDecoder 0 D.int)
 
 
 type alias ScoreData =
@@ -149,19 +144,7 @@ playResultDecoder =
     D.map6 PlayResult
         (D.field "character" D.string)
         (D.field "mode" gameModeDecoder)
-        (D.andThen
-            (\mi ->
-                case mi of
-                    Nothing ->
-                        D.succeed 0
-
-                    Just i ->
-                        D.succeed i
-            )
-         <|
-            D.maybe <|
-                D.field "score" D.int
-        )
+        (D.field "score" <| nvlDecoder 0 D.int)
         (D.field "armaments" <| D.list armamentDecoder)
         (D.field "reasons" <| D.list D.string)
         (D.field "created" D.string)
@@ -223,3 +206,8 @@ totalPlayStateDecoder =
     D.map2 TotalPlayState
         (D.field "hard" scoreDataDecoder)
         (D.field "normal" scoreDataDecoder)
+
+
+nvlDecoder : a -> D.Decoder a -> D.Decoder a
+nvlDecoder defaultValue decoder =
+    D.andThen (ME.unwrap (D.succeed defaultValue) D.succeed) <| D.maybe decoder
