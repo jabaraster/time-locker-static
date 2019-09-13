@@ -76,7 +76,6 @@ type Msg
     | UrlChanged Url.Url
     | CharacterListLoaded (Result Http.Error CharacterList)
     | LoadCharacterList
-    | GetCharacterListLoadedTime Time.Posix
     | CharactersSortStateChanged SortState
     | TotalPlayStateLoaded (Result Http.Error TotalPlayState)
     | LoadTotalPlayState
@@ -95,7 +94,7 @@ init _ url key =
         model =
             { key = key
             , page = convPage page
-            , characters = RR.updateSuccessData RR.empty <| List.map emptyCharacterScore characterNames
+            , characters = RR.withDummyData <| List.map emptyCharacterScore characterNames
             , charactersSortState = initialSortState
             , totalPlayState = RR.empty
             , scoreRanking = RR.empty
@@ -278,21 +277,18 @@ update msg model =
             case res of
                 Err _ ->
                     ( { model | characters = RR.updateData model.characters res }
-                    , Task.perform GetCharacterListLoadedTime Time.now
+                    , Cmd.none
                     )
 
                 Ok cs ->
                     ( { model | characters = RR.updateSuccessData model.characters <| sortCharacters model.charactersSortState cs }
-                    , Task.perform GetCharacterListLoadedTime Time.now
+                    , Cmd.none
                     )
 
         LoadCharacterList ->
             ( { model | characters = RR.startLoading model.characters }
             , Api.getCharacterList CharacterListLoaded
             )
-
-        GetCharacterListLoadedTime now ->
-            ( { model | characters = RR.updateLastLoadedTime model.characters now }, Cmd.none )
 
         CharactersSortStateChanged sortState ->
             let

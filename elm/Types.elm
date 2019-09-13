@@ -107,6 +107,7 @@ type alias Armament =
     , level : Int
     }
 
+
 armamentDecoder : D.Decoder Armament
 armamentDecoder =
     D.map2 Armament

@@ -1,4 +1,4 @@
-module RemoteResource exposing (RemoteResource, empty, emptyLoading, finishLoading, hasData, loadIfNecessary, new, resourceValue, startLoading, updateData, updateLastLoadedTime, updateSuccessData)
+module RemoteResource exposing (RemoteResource, empty, emptyLoading, finishLoading, hasData, loadIfNecessary, new, resourceValue, startLoading, updateData, updateSuccessData, withDummyData)
 
 import Http
 import Time
@@ -6,19 +6,24 @@ import Time
 
 type alias RemoteResource a =
     { data : Maybe (Result Http.Error a)
+    , dummyData : Maybe a
     , loading : Bool
-    , lastLoadedTime : Maybe Time.Posix
     }
 
 
 empty : RemoteResource a
 empty =
-    { data = Nothing, loading = False, lastLoadedTime = Nothing }
+    { data = Nothing, dummyData = Nothing, loading = False }
 
 
 emptyLoading : RemoteResource a
 emptyLoading =
     { empty | loading = True }
+
+
+withDummyData : a -> RemoteResource a
+withDummyData dummyData =
+    { empty | dummyData = Just dummyData }
 
 
 new : Result Http.Error a -> RemoteResource a
@@ -41,12 +46,12 @@ resourceValue rr defaultValue operation =
 
 updateData : RemoteResource a -> Result Http.Error a -> RemoteResource a
 updateData rr newData =
-    { rr | data = Just newData, loading = False }
+    { rr | data = Just newData, loading = False, dummyData = Nothing }
 
 
 updateSuccessData : RemoteResource a -> a -> RemoteResource a
 updateSuccessData rr newData =
-    { rr | data = Just <| Ok newData, loading = False }
+    { rr | data = Just <| Ok newData, loading = False, dummyData = Nothing }
 
 
 startLoading : RemoteResource a -> RemoteResource a
@@ -56,12 +61,7 @@ startLoading rr =
 
 finishLoading : RemoteResource a -> RemoteResource a
 finishLoading rr =
-    { rr | loading = False, lastLoadedTime = Nothing }
-
-
-updateLastLoadedTime : RemoteResource a -> Time.Posix -> RemoteResource a
-updateLastLoadedTime rr newTime =
-    { rr | lastLoadedTime = Just newTime }
+    { rr | loading = False }
 
 
 hasData : RemoteResource a -> Bool
@@ -71,9 +71,8 @@ hasData =
 
 loadIfNecessary : RemoteResource a -> Cmd msg -> ( RemoteResource a, Maybe (Cmd msg) )
 loadIfNecessary rr cmd =
-    case rr.data of
-        Just _ ->
-            ( rr, Nothing )
+    if hasData rr then
+        ( rr, Nothing )
 
-        Nothing ->
-            ( { rr | loading = True }, Just cmd )
+    else
+        ( startLoading rr, Just cmd )
