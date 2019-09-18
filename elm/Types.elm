@@ -235,3 +235,8 @@ type alias DailyPlaySummaryList =
 dailyPlaySummaryListDecoder : D.Decoder DailyPlaySummaryList
 dailyPlaySummaryListDecoder =
     D.list dailyPlaySummaryDecoder
+
+
+nvlDecoder : a -> D.Decoder a -> D.Decoder a
+nvlDecoder defaultValue decoder =
+    D.andThen (ME.unwrap (D.succeed defaultValue) D.succeed) <| D.maybe decoder
