@@ -69,10 +69,10 @@ hasData =
     Maybe.withDefault False << Maybe.map (\_ -> True) << .data
 
 
-loadIfNecessary : RemoteResource a -> Cmd msg -> ( RemoteResource a, Maybe (Cmd msg) )
+loadIfNecessary : RemoteResource a -> Cmd msg -> ( RemoteResource a, Cmd msg )
 loadIfNecessary rr cmd =
     if hasData rr then
-        ( rr, Nothing )
+        ( rr, Cmd.none )
 
     else
-        ( startLoading rr, Just cmd )
+        ( startLoading rr, cmd )

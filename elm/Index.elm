@@ -38,12 +38,14 @@ main =
 type PageForParser
     = DashboardPageW SortState
     | NotFoundPageW
+    | ScoreRankingPageW
     | CharacterSummaryPageW CharacterName
 
 
 type Page
     = DashboardPage
     | NotFoundPage
+    | ScoreRankingPage
     | CharacterSummaryPage CharacterName
 
 
@@ -55,6 +57,9 @@ convPage src =
 
         DashboardPageW _ ->
             DashboardPage
+
+        ScoreRankingPageW ->
+            ScoreRankingPage
 
         CharacterSummaryPageW name ->
             CharacterSummaryPage <| Maybe.withDefault name <| Url.percentDecode name
@@ -107,17 +112,18 @@ init _ url key =
                 | characters = RR.startLoading model.characters
                 , charactersSortState = sortState
                 , totalPlayState = RR.startLoading model.totalPlayState
-                , scoreRanking = RR.startLoading model.scoreRanking
               }
             , Cmd.batch
                 [ Api.getCharacterList CharacterListLoaded
                 , Api.getTotalPlayState TotalPlayStateLoaded
-                , Api.getScoreRanking ScoreRankingLoaded
                 ]
             )
 
         NotFoundPageW ->
             ( model, Cmd.none )
+
+        ScoreRankingPageW ->
+            ( { model | scoreRanking = RR.startLoading model.scoreRanking }, Api.getScoreRanking ScoreRankingLoaded )
 
         CharacterSummaryPageW name ->
             let
@@ -137,6 +143,7 @@ parseUrl url =
         Url.Parser.parse
             (Url.Parser.oneOf
                 [ Url.Parser.map DashboardPageW (Url.Parser.top <?> sortStateQueryParser)
+                , Url.Parser.map ScoreRankingPageW (Url.Parser.s "score-ranking")
                 , Url.Parser.map CharacterSummaryPageW (Url.Parser.s "character" </> Url.Parser.string)
                 ]
             )
@@ -234,25 +241,26 @@ update msg model =
             case newModel.page of
                 DashboardPage ->
                     let
-                        ( cs, mCsCmd ) =
+                        ( cs, csCmd ) =
                             RR.loadIfNecessary model.characters (Api.getCharacterList CharacterListLoaded)
 
-                        ( tp, mTpCmd ) =
+                        ( tp, tpCmd ) =
                             RR.loadIfNecessary model.totalPlayState (Api.getTotalPlayState TotalPlayStateLoaded)
-
-                        ( sr, mSrCmd ) =
-                            RR.loadIfNecessary model.scoreRanking (Api.getScoreRanking ScoreRankingLoaded)
                     in
                     ( { newModel
                         | characters = cs
                         , totalPlayState = tp
-                        , scoreRanking = sr
                       }
-                    , Cmd.batch <| ME.values [ mCsCmd, mTpCmd, mSrCmd ]
+                    , Cmd.batch [ csCmd, tpCmd ]
                     )
 
                 NotFoundPage ->
                     ( newModel, Cmd.none )
+
+                ScoreRankingPage ->
+                    case RR.loadIfNecessary model.scoreRanking (Api.getScoreRanking ScoreRankingLoaded) of
+                        ( res, cmd ) ->
+                            ( { newModel | scoreRanking = res }, cmd )
 
                 CharacterSummaryPage s ->
                     let
@@ -386,13 +394,16 @@ view model =
         doc =
             case model.page of
                 DashboardPage ->
-                    viewDashboard model
+                    viewDashboardPage model
 
                 NotFoundPage ->
-                    viewNotFound model
+                    viewNotFoundPage model
+
+                ScoreRankingPage ->
+                    viewScoreRankingPage model
 
                 CharacterSummaryPage name ->
-                    viewCharacterSummary model name <| Dict.get name model.characterSummaryList
+                    viewCharacterSummaryPage model name <| Dict.get name model.characterSummaryList
 
         loading =
             if isLoading model then
@@ -406,8 +417,8 @@ view model =
     }
 
 
-viewDashboard : Model -> Document Msg
-viewDashboard model =
+viewDashboardPage : Model -> Document Msg
+viewDashboardPage model =
     { title = "Dashboard"
     , body =
         [ viewHeader
@@ -415,20 +426,18 @@ viewDashboard model =
             []
                 ++ viewTotalPlayState model.totalPlayState
                 ++ [ hr [] [] ]
-                ++ viewScoreRanking model.scoreRanking
-                ++ [ hr [] [] ]
                 ++ viewCharacterList model.characters model.charactersSortState
         ]
     }
 
 
-viewCharacterSummary : Model -> CharacterName -> Maybe (RemoteResource CharacterSummary) -> Document Msg
-viewCharacterSummary model characterName mResource =
+viewCharacterSummaryPage : Model -> CharacterName -> Maybe (RemoteResource CharacterSummary) -> Document Msg
+viewCharacterSummaryPage model characterName mResource =
     { title = characterName ++ " Summary"
     , body =
-        [ div [ class "container character-summary" ] <|
-            [ header [] [ a [ href "/" ] [ text "< Back to Dashboard" ] ]
-            , img [ src <| characterImageUrl characterName 660 460, class "character" ] []
+        [ viewHeader
+        , div [ class "container character-summary" ] <|
+            [ img [ src <| characterImageUrl characterName 660 460, class "character" ] []
             , h3 [] <| span [ class "character-name" ] [ text characterName ] :: characterSummaryReloader characterName mResource
             ]
                 ++ (case mResource of
@@ -495,7 +504,7 @@ viewCharacterScoreRanking mode mSummary =
 
 viewPlayResult : PlayResult -> Html Msg
 viewPlayResult result =
-    div [ class "score-rank-container" ] <| playResultHtmls result
+    div [ class "score-rank-container" ] <| viewPlayResultCore result
 
 
 viewPlayResultWithCharacterImage : PlayResult -> Html Msg
@@ -507,11 +516,11 @@ viewPlayResultWithCharacterImage result =
                 , span [ class "character-name" ] [ text result.character ]
                 ]
             ]
-            :: playResultHtmls result
+            :: viewPlayResultCore result
 
 
-playResultHtmls : PlayResult -> List (Html Msg)
-playResultHtmls result =
+viewPlayResultCore : PlayResult -> List (Html Msg)
+viewPlayResultCore result =
     [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
     , span [ class <| "score " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text <| formatComma result.score ]
     , span [ class "play-time" ] [ text <| String.replace "T" " " <| String.dropRight 8 <| result.playTime ]
@@ -572,10 +581,21 @@ viewScoreSummaryCore mHardScore mNormalScore =
         ]
 
 
-viewNotFound : Model -> Document Msg
-viewNotFound _ =
-    { title = "Not Found"
+viewNotFoundPage : Model -> Document Msg
+viewNotFoundPage _ =
+    { title = "Not found"
     , body = [ h1 [] [ text "Not Found" ] ]
+    }
+
+
+viewScoreRankingPage : Model -> Document Msg
+viewScoreRankingPage model =
+    { title = "Score ranking"
+    , body =
+        [ viewHeader
+        , div [ class "container" ] <|
+            viewScoreRanking model.scoreRanking
+        ]
     }
 
 
@@ -604,16 +624,12 @@ checkboxProperty labelText sortState property =
 
 viewHeader : Html Msg
 viewHeader =
-    header [] [ h1 [] [ a [ href "/" ] [ text "Time Locker play result" ] ] ]
-
-
-viewDashboardHeader : Html Msg
-viewDashboardHeader =
-    div [ class "container" ] <|
-        [ h1 [] [ text "Dashboard" ]
-        , ul
-            []
-            [ li [] [ a [ href "/arms/score-per-level", target "time-locker-analyzer-table" ] [ text "Score per armament level" ] ] ]
+    header []
+        [ h1 [] [ a [ href "/" ] [ text "Time Locker play result" ] ]
+        , nav []
+            [ a [ href "/" ] [ text "Dashboard" ]
+            , a [ href "/score-ranking" ] [ text "Score ranking" ]
+            ]
         ]
 
 
