@@ -154,10 +154,29 @@ ul {
 th {
     word-break: break-all;
 }
-header > h1 {
-    > a, a:visited, a:hover {
-        color: @theme-color;
-        text-decoration-line: none;
+header {
+    > h1 {
+        > a, a:visited, a:hover {
+            color: @theme-color;
+            text-decoration-line: none;
+        }
+    }
+    nav {
+        margin-left: 1em;
+        a {
+            margin-left: .5em;
+            padding-top: 1px;
+            padding-bottom: 1px;
+            padding-left: 4px;
+            padding-right: 4px;
+            display: inline-block;
+            border-radius: 2px;
+            border-bottom: solid 1px rgba(180,180,180,.8);
+            border-right: solid 1px rgba(180,180,180,.8);
+        }
+        a:hover {
+            text-decoration: none;
+        }
     }
 }
 h1, h2, h3 {
