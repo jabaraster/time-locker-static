@@ -16,6 +16,7 @@ import RemoteResource as RR exposing (RemoteResource)
 import Set
 import Task
 import Time
+import Times
 import Types exposing (..)
 import Url
 import Url.Builder
@@ -67,6 +68,7 @@ convPage src =
 
 type alias Model =
     { key : Nav.Key
+    , zone : Time.Zone
     , page : Page
     , characters : RemoteResource CharacterList
     , charactersSortState : SortState
@@ -79,6 +81,7 @@ type alias Model =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | GetTimeZone Time.Zone
     | CharacterListLoaded (Result Http.Error CharacterList)
     | LoadCharacterList
     | CharactersSortStateChanged SortState
@@ -98,6 +101,7 @@ init _ url key =
 
         model =
             { key = key
+            , zone = Time.utc
             , page = convPage page
             , characters = RR.withDummyData <| List.map emptyCharacterScore characterNames
             , charactersSortState = initialSortState
@@ -116,6 +120,7 @@ init _ url key =
             , Cmd.batch
                 [ Api.getCharacterList CharacterListLoaded
                 , Api.getTotalPlayState TotalPlayStateLoaded
+                , Task.perform GetTimeZone Time.here
                 ]
             )
 
@@ -280,6 +285,9 @@ update msg model =
                             ( { newModel | page = CharacterSummaryPage characterName }
                             , Cmd.none
                             )
+
+        GetTimeZone zone ->
+            ( { model | zone = zone }, Cmd.none )
 
         CharacterListLoaded res ->
             case res of
@@ -447,7 +455,7 @@ viewCharacterSummaryPage model characterName mResource =
                             ]
 
                         Just rr ->
-                            viewCharacterSummaryCore characterName rr
+                            viewCharacterSummaryCore model.zone characterName rr
                    )
         ]
     }
@@ -467,8 +475,8 @@ characterSummaryReloader characterName mResource =
                 [ reloadButton rr.loading <| LoadCharacterSummary characterName ]
 
 
-viewCharacterSummaryCore : CharacterName -> RemoteResource CharacterSummary -> List (Html Msg)
-viewCharacterSummaryCore characterName rr =
+viewCharacterSummaryCore : Time.Zone -> CharacterName -> RemoteResource CharacterSummary -> List (Html Msg)
+viewCharacterSummaryCore zone characterName rr =
     case rr.data of
         Nothing ->
             [ span [] [ text "Now loading..." ]
@@ -482,33 +490,33 @@ viewCharacterSummaryCore characterName rr =
         Just (Ok data) ->
             [ viewScoreSummary data
             , h1 [] [ text "Score ranking" ]
-            , viewCharacterScoreRanking "Hard" data.hard
-            , viewCharacterScoreRanking "Normal" data.normal
+            , viewCharacterScoreRanking zone Hard data.hard
+            , viewCharacterScoreRanking zone Normal data.normal
             ]
 
 
-viewCharacterScoreRanking : String -> Maybe CharacterSummaryElement -> Html Msg
-viewCharacterScoreRanking mode mSummary =
+viewCharacterScoreRanking : Time.Zone -> GameMode -> Maybe CharacterSummaryElement -> Html Msg
+viewCharacterScoreRanking zone mode mSummary =
     case mSummary of
         Nothing ->
             div [ class "score-ranking-container" ]
-                [ h3 [] [ text mode ]
+                [ h3 [] [ text <| Types.gameModeToString mode ]
                 , span [] [ text "(No record)" ]
                 ]
 
         Just summary ->
             div [ class "score-ranking-container" ] <|
-                h3 [] [ text mode ]
-                    :: List.map viewPlayResult summary.scoreRanking
+                h3 [] [ text <| Types.gameModeToString mode ]
+                    :: List.map (viewPlayResult zone) summary.scoreRanking
 
 
-viewPlayResult : PlayResult -> Html Msg
-viewPlayResult result =
-    div [ class "score-rank-container" ] <| viewPlayResultCore result
+viewPlayResult : Time.Zone -> PlayResult -> Html Msg
+viewPlayResult zone result =
+    div [ class "score-rank-container" ] <| viewPlayResultCore zone result
 
 
-viewPlayResultWithCharacterImage : PlayResult -> Html Msg
-viewPlayResultWithCharacterImage result =
+viewPlayResultWithCharacterImage : Time.Zone -> PlayResult -> Html Msg
+viewPlayResultWithCharacterImage zone result =
     div [ class "score-rank-container" ] <|
         a [ href <| "/character/" ++ result.character ]
             [ div [ class "character-image-container" ]
@@ -516,14 +524,14 @@ viewPlayResultWithCharacterImage result =
                 , span [ class "character-name" ] [ text result.character ]
                 ]
             ]
-            :: viewPlayResultCore result
+            :: viewPlayResultCore zone result
 
 
-viewPlayResultCore : PlayResult -> List (Html Msg)
-viewPlayResultCore result =
+viewPlayResultCore : Time.Zone -> PlayResult -> List (Html Msg)
+viewPlayResultCore zone result =
     [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
     , span [ class <| "score " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text <| formatComma result.score ]
-    , span [ class "play-time" ] [ text <| String.replace "T" " " <| String.dropRight 8 <| result.playTime ]
+    , span [ class "play-time" ] [ text <| Times.omitSecond result.playTime zone ]
     , div [ class "armaments-container" ] <| List.map viewArmament result.armaments
     ]
 
@@ -594,7 +602,7 @@ viewScoreRankingPage model =
     , body =
         [ viewHeader
         , div [ class "container" ] <|
-            viewScoreRanking model.scoreRanking
+            viewScoreRanking model.zone model.scoreRanking
         ]
     }
 
@@ -652,8 +660,8 @@ viewTotalPlayState rr =
             ]
 
 
-viewScoreRanking : RemoteResource ScoreRanking -> List (Html Msg)
-viewScoreRanking rr =
+viewScoreRanking : Time.Zone -> RemoteResource ScoreRanking -> List (Html Msg)
+viewScoreRanking zone rr =
     let
         fixParts =
             h2 [] [ text "Score ranking", reloadButton rr.loading LoadScoreRanking ]
@@ -669,10 +677,10 @@ viewScoreRanking rr =
             [ fixParts
             , div [ class "score-ranking-container" ] <|
                 h3 [] [ text "Hard" ]
-                    :: (List.map viewPlayResultWithCharacterImage <| List.take 5 scoreRanking.hard)
+                    :: (List.map (viewPlayResultWithCharacterImage zone) <| List.take 10 scoreRanking.hard)
             , div [ class "score-ranking-container" ] <|
                 h3 [] [ text "Normal" ]
-                    :: (List.map viewPlayResultWithCharacterImage <| List.take 5 scoreRanking.normal)
+                    :: (List.map (viewPlayResultWithCharacterImage zone) <| List.take 10 scoreRanking.normal)
             ]
 
 
