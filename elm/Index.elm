@@ -41,6 +41,7 @@ type PageForParser
     | NotFoundPageW
     | ScoreRankingPageW
     | CharacterSummaryPageW CharacterName
+    | DailyPlayResultPageW
 
 
 type Page
@@ -48,6 +49,7 @@ type Page
     | NotFoundPage
     | ScoreRankingPage
     | CharacterSummaryPage CharacterName
+    | DailyPlayResultPage
 
 
 convPage : PageForParser -> Page
@@ -65,6 +67,9 @@ convPage src =
         CharacterSummaryPageW name ->
             CharacterSummaryPage <| Maybe.withDefault name <| Url.percentDecode name
 
+        DailyPlayResultPageW ->
+            DailyPlayResultPage
+
 
 type alias Model =
     { key : Nav.Key
@@ -73,8 +78,9 @@ type alias Model =
     , characters : RemoteResource CharacterList
     , charactersSortState : SortState
     , totalPlayState : RemoteResource TotalPlayState
-    , scoreRanking : RemoteResource ScoreRanking
+    , scoreRanking : RemoteResource PlayResults
     , characterSummaryList : Dict CharacterName (RemoteResource CharacterSummary)
+    , dailyPlayResult : RemoteResource DailyPlayResult
     }
 
 
@@ -87,10 +93,17 @@ type Msg
     | CharactersSortStateChanged SortState
     | TotalPlayStateLoaded (Result Http.Error TotalPlayState)
     | LoadTotalPlayState
-    | ScoreRankingLoaded (Result Http.Error ScoreRanking)
+    | ScoreRankingLoaded (Result Http.Error PlayResults)
     | LoadScoreRanking
     | CharacterSummaryLoaded CharacterName (Result Http.Error CharacterSummary)
     | LoadCharacterSummary CharacterName
+    | DailyPlayResultLoaded (Result Http.Error DailyPlayResult)
+    | LoadDailyPlayResult
+
+
+getTimeZone : Cmd Msg
+getTimeZone =
+    Task.perform GetTimeZone Time.here
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -108,6 +121,7 @@ init _ url key =
             , totalPlayState = RR.empty
             , scoreRanking = RR.empty
             , characterSummaryList = Dict.empty
+            , dailyPlayResult = RR.empty
             }
     in
     case page of
@@ -120,15 +134,20 @@ init _ url key =
             , Cmd.batch
                 [ Api.getCharacterList CharacterListLoaded
                 , Api.getTotalPlayState TotalPlayStateLoaded
-                , Task.perform GetTimeZone Time.here
+                , getTimeZone
                 ]
             )
 
         NotFoundPageW ->
-            ( model, Cmd.none )
+            ( model, Task.perform GetTimeZone Time.here )
 
         ScoreRankingPageW ->
-            ( { model | scoreRanking = RR.startLoading model.scoreRanking }, Api.getScoreRanking ScoreRankingLoaded )
+            ( { model | scoreRanking = RR.startLoading model.scoreRanking }
+            , Cmd.batch
+                [ Api.getScoreRanking ScoreRankingLoaded
+                , getTimeZone
+                ]
+            )
 
         CharacterSummaryPageW name ->
             let
@@ -138,7 +157,18 @@ init _ url key =
             ( { model
                 | characterSummaryList = Dict.insert characterName RR.emptyLoading model.characterSummaryList
               }
-            , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+            , Cmd.batch
+                [ Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+                , getTimeZone
+                ]
+            )
+
+        DailyPlayResultPageW ->
+            ( { model | dailyPlayResult = RR.startLoading model.dailyPlayResult }
+            , Cmd.batch
+                [ Api.getDailyPlayResult DailyPlayResultLoaded
+                , getTimeZone
+                ]
             )
 
 
@@ -150,6 +180,7 @@ parseUrl url =
                 [ Url.Parser.map DashboardPageW (Url.Parser.top <?> sortStateQueryParser)
                 , Url.Parser.map ScoreRankingPageW (Url.Parser.s "score-ranking")
                 , Url.Parser.map CharacterSummaryPageW (Url.Parser.s "character" </> Url.Parser.string)
+                , Url.Parser.map DailyPlayResultPageW (Url.Parser.s "daily-play-result")
                 ]
             )
             url
@@ -286,6 +317,13 @@ update msg model =
                             , Cmd.none
                             )
 
+                DailyPlayResultPage ->
+                    let
+                        ( res, cmd ) =
+                            RR.loadIfNecessary newModel.dailyPlayResult (Api.getDailyPlayResult DailyPlayResultLoaded)
+                    in
+                    ( { newModel | dailyPlayResult = res }, cmd )
+
         GetTimeZone zone ->
             ( { model | zone = zone }, Cmd.none )
 
@@ -384,6 +422,19 @@ update msg model =
                     , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
                     )
 
+        DailyPlayResultLoaded res ->
+            case res of
+                Err _ ->
+                    ( { model | dailyPlayResult = RR.updateData model.dailyPlayResult res }, Cmd.none )
+
+                Ok s ->
+                    ( { model | dailyPlayResult = RR.updateSuccessData model.dailyPlayResult s }, Cmd.none )
+
+        LoadDailyPlayResult ->
+            ( { model | dailyPlayResult = RR.startLoading model.dailyPlayResult }
+            , Api.getDailyPlayResult DailyPlayResultLoaded
+            )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
@@ -393,7 +444,10 @@ subscriptions _ =
 isLoading : Model -> Bool
 isLoading model =
     model.characters.loading
+        || model.totalPlayState.loading
         || (List.any .loading <| Dict.values model.characterSummaryList)
+        || model.scoreRanking.loading
+        || model.dailyPlayResult.loading
 
 
 view : Model -> Document Msg
@@ -413,6 +467,9 @@ view model =
                 CharacterSummaryPage name ->
                     viewCharacterSummaryPage model name <| Dict.get name model.characterSummaryList
 
+                DailyPlayResultPage ->
+                    viewDailyPlayResultPage model
+
         loading =
             if isLoading model then
                 [ span [ class "fas fa-spinner loading loading-icon" ] [] ]
@@ -421,7 +478,7 @@ view model =
                 []
     in
     { title = doc.title ++ " | Jabara's Time Locker play result"
-    , body = loading ++ doc.body
+    , body = loading ++ [ viewHeader ] ++ doc.body
     }
 
 
@@ -429,8 +486,7 @@ viewDashboardPage : Model -> Document Msg
 viewDashboardPage model =
     { title = "Dashboard"
     , body =
-        [ viewHeader
-        , div [ class "container dashboard" ] <|
+        [ div [ class "container dashboard" ] <|
             []
                 ++ viewTotalPlayState model.totalPlayState
                 ++ [ hr [] [] ]
@@ -439,12 +495,44 @@ viewDashboardPage model =
     }
 
 
+viewDailyPlayResultPage : Model -> Document Msg
+viewDailyPlayResultPage model =
+    { title = "Daily play result"
+    , body =
+        [ div [ class "container" ] <|
+            h2 [] [ text "Daily play result", reloadButton model.dailyPlayResult.loading LoadDailyPlayResult ]
+                :: viewDailyPlayResultPageCore model
+        ]
+    }
+
+
+viewDailyPlayResultPageCore : Model -> List (Html Msg)
+viewDailyPlayResultPageCore model =
+    let
+        dailyPlayResult =
+            model.dailyPlayResult
+    in
+    case dailyPlayResult.data of
+        Nothing ->
+            [ span [] [ text "Now loading..." ] ]
+
+        Just (Err _) ->
+            [ span [] [ text "Fail loading..." ] ]
+
+        Just (Ok res) ->
+            [ h3 [] [ text "Detail" ]
+            ]
+                ++ [ h4 [] [ text "Hard" ] ]
+                ++ (List.map (viewPlayResultWithCharacterImage model.zone) <| List.take 20 res.detail.hard)
+                ++ [ h4 [] [ text "Normal" ] ]
+                ++ (List.map (viewPlayResultWithCharacterImage model.zone) <| List.take 20 res.detail.normal)
+
+
 viewCharacterSummaryPage : Model -> CharacterName -> Maybe (RemoteResource CharacterSummary) -> Document Msg
 viewCharacterSummaryPage model characterName mResource =
     { title = characterName ++ " Summary"
     , body =
-        [ viewHeader
-        , div [ class "container character-summary" ] <|
+        [ div [ class "container character-summary" ] <|
             [ img [ src <| characterImageUrl characterName 660 460, class "character" ] []
             , h3 [] <| span [ class "character-name" ] [ text characterName ] :: characterSummaryReloader characterName mResource
             ]
@@ -600,8 +688,7 @@ viewScoreRankingPage : Model -> Document Msg
 viewScoreRankingPage model =
     { title = "Score ranking"
     , body =
-        [ viewHeader
-        , div [ class "container" ] <|
+        [ div [ class "container" ] <|
             viewScoreRanking model.zone model.scoreRanking
         ]
     }
@@ -636,6 +723,7 @@ viewHeader =
         [ h1 [] [ a [ href "/" ] [ text "Time Locker play result" ] ]
         , nav []
             [ a [ href "/" ] [ text "Dashboard" ]
+            , a [ href "/daily-play-result" ] [ text "Daily play result" ]
             , a [ href "/score-ranking" ] [ text "Score ranking" ]
             ]
         ]
@@ -660,7 +748,7 @@ viewTotalPlayState rr =
             ]
 
 
-viewScoreRanking : Time.Zone -> RemoteResource ScoreRanking -> List (Html Msg)
+viewScoreRanking : Time.Zone -> RemoteResource PlayResults -> List (Html Msg)
 viewScoreRanking zone rr =
     let
         fixParts =

@@ -2,6 +2,8 @@ module Types exposing (..)
 
 import Json.Decode as D
 import Maybe.Extra as ME
+import Time
+import Times
 
 
 type alias CharacterName =
@@ -136,7 +138,7 @@ type alias PlayResult =
     , score : Int
     , armaments : List Armament
     , reasons : List String
-    , playTime : String
+    , playTime : Time.Posix
     }
 
 
@@ -148,7 +150,7 @@ playResultDecoder =
         (D.field "score" <| nvlDecoder 0 D.int)
         (D.field "armaments" <| D.list armamentDecoder)
         (D.field "reasons" <| D.list D.string)
-        (D.field "created" D.string)
+        (D.field "created" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime s))
 
 
 type alias CharacterSummaryElement =
@@ -164,15 +166,15 @@ characterSummaryElementDecoder =
         (D.field "scoreRanking" <| D.list playResultDecoder)
 
 
-type alias ScoreRanking =
+type alias PlayResults =
     { hard : List PlayResult
     , normal : List PlayResult
     }
 
 
-scoreRankingDecoder : D.Decoder ScoreRanking
-scoreRankingDecoder =
-    D.map2 ScoreRanking
+playResultsDecoder : D.Decoder PlayResults
+playResultsDecoder =
+    D.map2 PlayResults
         (D.field "hard" <| D.list playResultDecoder)
         (D.field "normal" <| D.list playResultDecoder)
 
@@ -207,6 +209,49 @@ totalPlayStateDecoder =
     D.map2 TotalPlayState
         (D.field "hard" scoreDataDecoder)
         (D.field "normal" scoreDataDecoder)
+
+
+type alias DailyScoreData =
+    { playCount : Int
+    , highScore : Int
+    , averageScore : Float
+    , playDate : Time.Posix
+    }
+
+
+dailyScoreDataDecoder : D.Decoder DailyScoreData
+dailyScoreDataDecoder =
+    D.map4 DailyScoreData
+        (D.field "playCount" D.int)
+        (D.field "highScore" D.int)
+        (D.field "averageScore" D.float)
+        (D.field "playDate" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime <| s ++ "T00:00:00.000Z"))
+
+
+type alias DailyScoreDatas =
+    { hard : List DailyScoreData
+    , normal : List DailyScoreData
+    }
+
+
+dailyScoreDatasDecoder : D.Decoder DailyScoreDatas
+dailyScoreDatasDecoder =
+    D.map2 DailyScoreDatas
+        (D.field "hard" <| D.list dailyScoreDataDecoder)
+        (D.field "normal" <| D.list dailyScoreDataDecoder)
+
+
+type alias DailyPlayResult =
+    { summary : DailyScoreDatas
+    , detail : PlayResults
+    }
+
+
+dailyPlayResultDecoder : D.Decoder DailyPlayResult
+dailyPlayResultDecoder =
+    D.map2 DailyPlayResult
+        (D.field "summary" dailyScoreDatasDecoder)
+        (D.field "detail" playResultsDecoder)
 
 
 nvlDecoder : a -> D.Decoder a -> D.Decoder a

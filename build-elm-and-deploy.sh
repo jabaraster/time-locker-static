@@ -1,6 +1,7 @@
 #!/bin/sh
 elm-format elm/Index.elm --output elm/Index.elm --yes \
   && elm-format elm/Api.elm --output elm/Api.elm --yes \
+  && elm-format elm/Times.elm --output elm/Times.elm --yes \
   && elm-format elm/Types.elm --output elm/Types.elm --yes \
   && elm-format elm/RemoteResource.elm --output elm/RemoteResource.elm --yes \
   && elm make elm/Index.elm --output=./.work/index.js \
