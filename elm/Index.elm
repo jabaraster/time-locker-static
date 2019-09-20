@@ -40,16 +40,16 @@ type PageForParser
     = DashboardPageW SortState
     | NotFoundPageW
     | ScoreRankingPageW
-    | CharacterSummaryPageW CharacterName
-    | DailyPlayResultPageW
+    | CharacterPageW CharacterName
+    | DailyResultPageW
 
 
 type Page
     = DashboardPage
     | NotFoundPage
     | ScoreRankingPage
-    | CharacterSummaryPage CharacterName
-    | DailyPlayResultPage
+    | CharacterPage CharacterName
+    | DailyResultPage
 
 
 convPage : PageForParser -> Page
@@ -64,11 +64,11 @@ convPage src =
         ScoreRankingPageW ->
             ScoreRankingPage
 
-        CharacterSummaryPageW name ->
-            CharacterSummaryPage <| Maybe.withDefault name <| Url.percentDecode name
+        CharacterPageW name ->
+            CharacterPage <| Maybe.withDefault name <| Url.percentDecode name
 
-        DailyPlayResultPageW ->
-            DailyPlayResultPage
+        DailyResultPageW ->
+            DailyResultPage
 
 
 type alias Model =
@@ -77,10 +77,10 @@ type alias Model =
     , page : Page
     , characters : RemoteResource CharacterList
     , charactersSortState : SortState
-    , totalPlayState : RemoteResource TotalPlayState
-    , scoreRanking : RemoteResource PlayResults
-    , characterSummaryList : Dict CharacterName (RemoteResource CharacterSummary)
-    , dailyPlayResult : RemoteResource DailyPlayResult
+    , totalResult : RemoteResource TotalResult
+    , scoreRanking : RemoteResource ModePlayResults
+    , characterResultList : Dict CharacterName (RemoteResource CharacterResult)
+    , dailyResult : RemoteResource DailyResult
     }
 
 
@@ -91,14 +91,14 @@ type Msg
     | CharacterListLoaded (Result Http.Error CharacterList)
     | LoadCharacterList
     | CharactersSortStateChanged SortState
-    | TotalPlayStateLoaded (Result Http.Error TotalPlayState)
-    | LoadTotalPlayState
-    | ScoreRankingLoaded (Result Http.Error PlayResults)
+    | TotalResultLoaded (Result Http.Error TotalResult)
+    | LoadTotalResult
+    | ScoreRankingLoaded (Result Http.Error ModePlayResults)
     | LoadScoreRanking
-    | CharacterSummaryLoaded CharacterName (Result Http.Error CharacterSummary)
-    | LoadCharacterSummary CharacterName
-    | DailyPlayResultLoaded (Result Http.Error DailyPlayResult)
-    | LoadDailyPlayResult
+    | CharacterResultLoaded CharacterName (Result Http.Error CharacterResult)
+    | LoadCharacterResult CharacterName
+    | DailyResultLoaded (Result Http.Error DailyResult)
+    | LoadDailyResult
 
 
 getTimeZone : Cmd Msg
@@ -118,10 +118,10 @@ init _ url key =
             , page = convPage page
             , characters = RR.withDummyData <| List.map emptyCharacterScore characterNames
             , charactersSortState = initialSortState
-            , totalPlayState = RR.empty
+            , totalResult = RR.empty
             , scoreRanking = RR.empty
-            , characterSummaryList = Dict.empty
-            , dailyPlayResult = RR.empty
+            , characterResultList = Dict.empty
+            , dailyResult = RR.empty
             }
     in
     case page of
@@ -129,11 +129,11 @@ init _ url key =
             ( { model
                 | characters = RR.startLoading model.characters
                 , charactersSortState = sortState
-                , totalPlayState = RR.startLoading model.totalPlayState
+                , totalResult = RR.startLoading model.totalResult
               }
             , Cmd.batch
                 [ Api.getCharacterList CharacterListLoaded
-                , Api.getTotalPlayState TotalPlayStateLoaded
+                , Api.getTotalResult TotalResultLoaded
                 , getTimeZone
                 ]
             )
@@ -149,24 +149,24 @@ init _ url key =
                 ]
             )
 
-        CharacterSummaryPageW name ->
+        CharacterPageW name ->
             let
                 characterName =
                     Maybe.withDefault name <| Url.percentDecode name
             in
             ( { model
-                | characterSummaryList = Dict.insert characterName RR.emptyLoading model.characterSummaryList
+                | characterResultList = Dict.insert characterName RR.emptyLoading model.characterResultList
               }
             , Cmd.batch
-                [ Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+                [ Api.getCharacterResult characterName <| CharacterResultLoaded characterName
                 , getTimeZone
                 ]
             )
 
-        DailyPlayResultPageW ->
-            ( { model | dailyPlayResult = RR.startLoading model.dailyPlayResult }
+        DailyResultPageW ->
+            ( { model | dailyResult = RR.startLoading model.dailyResult }
             , Cmd.batch
-                [ Api.getDailyPlayResult DailyPlayResultLoaded
+                [ Api.getDailyResult DailyResultLoaded
                 , getTimeZone
                 ]
             )
@@ -179,8 +179,8 @@ parseUrl url =
             (Url.Parser.oneOf
                 [ Url.Parser.map DashboardPageW (Url.Parser.top <?> sortStateQueryParser)
                 , Url.Parser.map ScoreRankingPageW (Url.Parser.s "score-ranking")
-                , Url.Parser.map CharacterSummaryPageW (Url.Parser.s "character" </> Url.Parser.string)
-                , Url.Parser.map DailyPlayResultPageW (Url.Parser.s "daily-play-result")
+                , Url.Parser.map CharacterPageW (Url.Parser.s "character" </> Url.Parser.string)
+                , Url.Parser.map DailyResultPageW (Url.Parser.s "daily-result")
                 ]
             )
             url
@@ -281,11 +281,11 @@ update msg model =
                             RR.loadIfNecessary model.characters (Api.getCharacterList CharacterListLoaded)
 
                         ( tp, tpCmd ) =
-                            RR.loadIfNecessary model.totalPlayState (Api.getTotalPlayState TotalPlayStateLoaded)
+                            RR.loadIfNecessary model.totalResult (Api.getTotalResult TotalResultLoaded)
                     in
                     ( { newModel
                         | characters = cs
-                        , totalPlayState = tp
+                        , totalResult = tp
                       }
                     , Cmd.batch [ csCmd, tpCmd ]
                     )
@@ -298,31 +298,31 @@ update msg model =
                         ( res, cmd ) ->
                             ( { newModel | scoreRanking = res }, cmd )
 
-                CharacterSummaryPage s ->
+                CharacterPage s ->
                     let
                         characterName =
                             Maybe.withDefault s <| Url.percentDecode s
                     in
-                    case Dict.get characterName model.characterSummaryList of
+                    case Dict.get characterName model.characterResultList of
                         Nothing ->
                             ( { newModel
-                                | page = CharacterSummaryPage characterName
-                                , characterSummaryList = Dict.insert characterName RR.emptyLoading model.characterSummaryList
+                                | page = CharacterPage characterName
+                                , characterResultList = Dict.insert characterName RR.emptyLoading model.characterResultList
                               }
-                            , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+                            , Api.getCharacterResult characterName <| CharacterResultLoaded characterName
                             )
 
                         Just inList ->
-                            ( { newModel | page = CharacterSummaryPage characterName }
+                            ( { newModel | page = CharacterPage characterName }
                             , Cmd.none
                             )
 
-                DailyPlayResultPage ->
+                DailyResultPage ->
                     let
                         ( res, cmd ) =
-                            RR.loadIfNecessary newModel.dailyPlayResult (Api.getDailyPlayResult DailyPlayResultLoaded)
+                            RR.loadIfNecessary newModel.dailyResult (Api.getDailyResult DailyResultLoaded)
                     in
-                    ( { newModel | dailyPlayResult = res }, cmd )
+                    ( { newModel | dailyResult = res }, cmd )
 
         GetTimeZone zone ->
             ( { model | zone = zone }, Cmd.none )
@@ -366,17 +366,17 @@ update msg model =
                     , cmd
                     )
 
-        TotalPlayStateLoaded res ->
+        TotalResultLoaded res ->
             case res of
                 Err _ ->
-                    ( { model | totalPlayState = RR.updateData model.totalPlayState res }, Cmd.none )
+                    ( { model | totalResult = RR.updateData model.totalResult res }, Cmd.none )
 
                 Ok s ->
-                    ( { model | totalPlayState = RR.updateSuccessData model.totalPlayState s }, Cmd.none )
+                    ( { model | totalResult = RR.updateSuccessData model.totalResult s }, Cmd.none )
 
-        LoadTotalPlayState ->
-            ( { model | totalPlayState = RR.startLoading model.totalPlayState }
-            , Api.getTotalPlayState TotalPlayStateLoaded
+        LoadTotalResult ->
+            ( { model | totalResult = RR.startLoading model.totalResult }
+            , Api.getTotalResult TotalResultLoaded
             )
 
         ScoreRankingLoaded res ->
@@ -392,47 +392,47 @@ update msg model =
             , Api.getScoreRanking ScoreRankingLoaded
             )
 
-        CharacterSummaryLoaded characterName res ->
-            case Dict.get characterName model.characterSummaryList of
+        CharacterResultLoaded characterName res ->
+            case Dict.get characterName model.characterResultList of
                 Nothing ->
                     ( { model
-                        | characterSummaryList =
-                            Dict.insert characterName (RR.new <| res) model.characterSummaryList
+                        | characterResultList =
+                            Dict.insert characterName (RR.new <| res) model.characterResultList
                       }
                     , Cmd.none
                     )
 
                 Just inList ->
                     ( { model
-                        | characterSummaryList =
-                            Dict.insert characterName (RR.updateData inList res) model.characterSummaryList
+                        | characterResultList =
+                            Dict.insert characterName (RR.updateData inList res) model.characterResultList
                       }
                     , Cmd.none
                     )
 
-        LoadCharacterSummary characterName ->
-            case Dict.get characterName model.characterSummaryList of
+        LoadCharacterResult characterName ->
+            case Dict.get characterName model.characterResultList of
                 Nothing ->
-                    ( { model | characterSummaryList = Dict.insert characterName (RR.startLoading RR.empty) model.characterSummaryList }
-                    , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+                    ( { model | characterResultList = Dict.insert characterName (RR.startLoading RR.empty) model.characterResultList }
+                    , Api.getCharacterResult characterName <| CharacterResultLoaded characterName
                     )
 
                 Just rr ->
-                    ( { model | characterSummaryList = Dict.update characterName (Maybe.map RR.startLoading) model.characterSummaryList }
-                    , Api.getCharacterSummary characterName <| CharacterSummaryLoaded characterName
+                    ( { model | characterResultList = Dict.update characterName (Maybe.map RR.startLoading) model.characterResultList }
+                    , Api.getCharacterResult characterName <| CharacterResultLoaded characterName
                     )
 
-        DailyPlayResultLoaded res ->
+        DailyResultLoaded res ->
             case res of
                 Err _ ->
-                    ( { model | dailyPlayResult = RR.updateData model.dailyPlayResult res }, Cmd.none )
+                    ( { model | dailyResult = RR.updateData model.dailyResult res }, Cmd.none )
 
                 Ok s ->
-                    ( { model | dailyPlayResult = RR.updateSuccessData model.dailyPlayResult s }, Cmd.none )
+                    ( { model | dailyResult = RR.updateSuccessData model.dailyResult s }, Cmd.none )
 
-        LoadDailyPlayResult ->
-            ( { model | dailyPlayResult = RR.startLoading model.dailyPlayResult }
-            , Api.getDailyPlayResult DailyPlayResultLoaded
+        LoadDailyResult ->
+            ( { model | dailyResult = RR.startLoading model.dailyResult }
+            , Api.getDailyResult DailyResultLoaded
             )
 
 
@@ -444,10 +444,10 @@ subscriptions _ =
 isLoading : Model -> Bool
 isLoading model =
     model.characters.loading
-        || model.totalPlayState.loading
-        || (List.any .loading <| Dict.values model.characterSummaryList)
+        || model.totalResult.loading
+        || (List.any .loading <| Dict.values model.characterResultList)
         || model.scoreRanking.loading
-        || model.dailyPlayResult.loading
+        || model.dailyResult.loading
 
 
 view : Model -> Document Msg
@@ -455,19 +455,19 @@ view model =
     let
         doc =
             case model.page of
-                DashboardPage ->
-                    viewDashboardPage model
-
                 NotFoundPage ->
                     viewNotFoundPage model
+
+                DashboardPage ->
+                    viewDashboardPage model
 
                 ScoreRankingPage ->
                     viewScoreRankingPage model
 
-                CharacterSummaryPage name ->
-                    viewCharacterSummaryPage model name <| Dict.get name model.characterSummaryList
+                CharacterPage name ->
+                    viewCharacterPage model name <| Dict.get name model.characterResultList
 
-                DailyPlayResultPage ->
+                DailyResultPage ->
                     viewDailyPlayResultPage model
 
         loading =
@@ -488,7 +488,7 @@ viewDashboardPage model =
     , body =
         [ div [ class "container dashboard" ] <|
             []
-                ++ viewTotalPlayState model.totalPlayState
+                ++ viewTotalResult model.totalResult
                 ++ [ hr [] [] ]
                 ++ viewCharacterList model.characters model.charactersSortState
         ]
@@ -500,7 +500,7 @@ viewDailyPlayResultPage model =
     { title = "Daily play result"
     , body =
         [ div [ class "container" ] <|
-            h2 [] [ text "Daily play result", reloadButton model.dailyPlayResult.loading LoadDailyPlayResult ]
+            h2 [] [ text "Daily play result", reloadButton model.dailyResult.loading LoadDailyResult ]
                 :: viewDailyPlayResultPageCore model
         ]
     }
@@ -510,7 +510,7 @@ viewDailyPlayResultPageCore : Model -> List (Html Msg)
 viewDailyPlayResultPageCore model =
     let
         dailyPlayResult =
-            model.dailyPlayResult
+            model.dailyResult
     in
     case dailyPlayResult.data of
         Nothing ->
@@ -524,8 +524,8 @@ viewDailyPlayResultPageCore model =
                 :: (List.map (viewPlayResultWithCharacterImage model.zone True) <| flattenPlayResults res.detail)
 
 
-viewCharacterSummaryPage : Model -> CharacterName -> Maybe (RemoteResource CharacterSummary) -> Document Msg
-viewCharacterSummaryPage model characterName mResource =
+viewCharacterPage : Model -> CharacterName -> Maybe (RemoteResource CharacterResult) -> Document Msg
+viewCharacterPage model characterName mResource =
     { title = characterName ++ " Summary"
     , body =
         [ div [ class "container character-summary" ] <|
@@ -539,13 +539,13 @@ viewCharacterSummaryPage model characterName mResource =
                             ]
 
                         Just rr ->
-                            viewCharacterSummaryCore model.zone characterName rr
+                            viewCharacterResultCore model.zone characterName rr
                    )
         ]
     }
 
 
-characterSummaryReloader : CharacterName -> Maybe (RemoteResource CharacterSummary) -> List (Html Msg)
+characterSummaryReloader : CharacterName -> Maybe (RemoteResource CharacterResult) -> List (Html Msg)
 characterSummaryReloader characterName mResource =
     case mResource of
         Nothing ->
@@ -556,11 +556,11 @@ characterSummaryReloader characterName mResource =
                 []
 
             else
-                [ reloadButton rr.loading <| LoadCharacterSummary characterName ]
+                [ reloadButton rr.loading <| LoadCharacterResult characterName ]
 
 
-viewCharacterSummaryCore : Time.Zone -> CharacterName -> RemoteResource CharacterSummary -> List (Html Msg)
-viewCharacterSummaryCore zone characterName rr =
+viewCharacterResultCore : Time.Zone -> CharacterName -> RemoteResource CharacterResult -> List (Html Msg)
+viewCharacterResultCore zone characterName rr =
     case rr.data of
         Nothing ->
             [ span [] [ text "Now loading..." ]
@@ -574,29 +574,26 @@ viewCharacterSummaryCore zone characterName rr =
         Just (Ok data) ->
             [ viewScoreSummary data
             , h1 [] [ text "Score ranking" ]
-            , viewCharacterScoreRanking zone Hard data.hard
-            , viewCharacterScoreRanking zone Normal data.normal
+            , viewCharacterScoreRanking zone Hard data.ranking.hard
+            , viewCharacterScoreRanking zone Normal data.ranking.normal
             ]
 
 
-viewCharacterScoreRanking : Time.Zone -> GameMode -> Maybe CharacterSummaryElement -> Html Msg
-viewCharacterScoreRanking zone mode mSummary =
-    case mSummary of
-        Nothing ->
-            div [ class "score-ranking-container" ]
-                [ h3 [] [ text <| Types.gameModeToString mode ]
-                , span [] [ text "(No record)" ]
-                ]
+viewCharacterScoreRanking : Time.Zone -> GameMode -> List PlayResult -> Html Msg
+viewCharacterScoreRanking zone mode rankings =
+    div [ class "score-ranking-container" ] <|
+        h3 [] [ text <| Types.gameModeToString mode ]
+            :: (if List.length rankings == 0 then
+                    [ span [] [ text "(No record)" ] ]
 
-        Just summary ->
-            div [ class "score-ranking-container" ] <|
-                h3 [] [ text <| Types.gameModeToString mode ]
-                    :: List.map (viewPlayResult zone) summary.scoreRanking
+                else
+                    List.map (viewPlayResult zone False) rankings
+               )
 
 
-viewPlayResult : Time.Zone -> PlayResult -> Html Msg
-viewPlayResult zone result =
-    div [ class "score-rank-container" ] <| viewPlayResultCore zone result
+viewPlayResult : Time.Zone -> Bool -> PlayResult -> Html Msg
+viewPlayResult zone showMissSituation result =
+    div [ class "score-rank-container" ] <| viewPlayResultCore zone showMissSituation result
 
 
 viewPlayResultWithCharacterImage : Time.Zone -> Bool -> PlayResult -> Html Msg
@@ -608,8 +605,7 @@ viewPlayResultWithCharacterImage zone showMissSituation result =
                 , span [ class "character-name" ] [ text result.character ]
                 ]
             ]
-            :: viewPlayResultCore zone result
-            ++ (toListH <| viewMissSituation showMissSituation result)
+            :: viewPlayResultCore zone showMissSituation result
 
 
 viewMissSituation : Bool -> PlayResult -> Maybe (Html Msg)
@@ -631,15 +627,16 @@ viewMissSituation showMissSituation result =
         Nothing
 
 
-viewPlayResultCore : Time.Zone -> PlayResult -> List (Html Msg)
-viewPlayResultCore zone result =
-    [ div []
+viewPlayResultCore : Time.Zone -> Bool -> PlayResult -> List (Html Msg)
+viewPlayResultCore zone showMissSituation result =
+    div []
         [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
         , span [ class <| "score " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text <| formatComma result.score ]
         , span [ class "play-time" ] [ text <| Times.omitSecond result.playTime zone ]
         ]
-    , div [ class "armaments-container" ] <| List.map viewArmament result.armaments
-    ]
+        :: (toListH <| viewMissSituation showMissSituation result)
+        ++ [ div [ class "armaments-container" ] <| List.map viewArmament result.armaments
+           ]
 
 
 viewArmament : Armament -> Html Msg
@@ -650,14 +647,20 @@ viewArmament arm =
         ]
 
 
-viewScoreSummary : CharacterSummary -> Html Msg
-viewScoreSummary summary =
-    viewScoreSummaryCore (Maybe.map .scoreSummary summary.hard) (Maybe.map .scoreSummary summary.normal)
+viewScoreSummary : CharacterResult -> Html Msg
+viewScoreSummary characterResult =
+    viewScoreSummaryCore characterResult.summary
 
 
-viewScoreSummaryCore : Maybe ScoreData -> Maybe ScoreData -> Html Msg
-viewScoreSummaryCore mHardScore mNormalScore =
+viewScoreSummaryCore : ModeSummaryScore -> Html Msg
+viewScoreSummaryCore summary =
     let
+        mHardScore =
+            summary.hard
+
+        mNormalScore =
+            summary.normal
+
         playCountMapper =
             formatComma << .playCount
 
@@ -738,20 +741,20 @@ checkboxProperty labelText sortState property =
 viewHeader : Html Msg
 viewHeader =
     header []
-        [ h1 [] [ a [ href "/" ] [ text "Time Locker play result" ] ]
+        [ h1 [] [ a [ href "/" ] [ text "Time Locker result" ] ]
         , nav []
             [ a [ href "/" ] [ text "Dashboard" ]
-            , a [ href "/daily-play-result" ] [ text "Daily play result" ]
+            , a [ href "/daily-result" ] [ text "Daily result" ]
             , a [ href "/score-ranking" ] [ text "Score ranking" ]
             ]
         ]
 
 
-viewTotalPlayState : RemoteResource TotalPlayState -> List (Html Msg)
-viewTotalPlayState rr =
+viewTotalResult : RemoteResource TotalResult -> List (Html Msg)
+viewTotalResult rr =
     let
         fixParts =
-            h2 [] [ text "Total play state", reloadButton rr.loading LoadTotalPlayState ]
+            h2 [] [ text "Total", reloadButton rr.loading LoadTotalResult ]
     in
     case rr.data of
         Nothing ->
@@ -760,13 +763,13 @@ viewTotalPlayState rr =
         Just (Err _) ->
             [ fixParts, span [] [ text "Fail loading characters..." ] ]
 
-        Just (Ok totalPlayScore) ->
+        Just (Ok totalResult) ->
             [ fixParts
-            , viewScoreSummaryCore (Just totalPlayScore.hard) (Just totalPlayScore.normal)
+            , viewScoreSummaryCore { hard = Just totalResult.hard, normal = Just totalResult.normal }
             ]
 
 
-viewScoreRanking : Time.Zone -> RemoteResource PlayResults -> List (Html Msg)
+viewScoreRanking : Time.Zone -> RemoteResource ModePlayResults -> List (Html Msg)
 viewScoreRanking zone rr =
     let
         fixParts =
@@ -850,7 +853,7 @@ tagScore c =
         ]
 
 
-tagHighScore : Maybe ScoreData -> List (Html.Html msg)
+tagHighScore : Maybe SummaryScore -> List (Html.Html msg)
 tagHighScore mScore =
     [ tr [ class "score-element" ]
         [ th [] [ text "Play count" ]

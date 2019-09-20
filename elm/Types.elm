@@ -12,8 +12,8 @@ type alias CharacterName =
 
 type alias CharacterScore =
     { character : CharacterName
-    , normal : Maybe ScoreData
-    , hard : Maybe ScoreData
+    , normal : Maybe SummaryScore
+    , hard : Maybe SummaryScore
     }
 
 
@@ -77,7 +77,7 @@ initialSortState =
     }
 
 
-getScoreForMode : GameMode -> CharacterScore -> Maybe ScoreData
+getScoreForMode : GameMode -> CharacterScore -> Maybe SummaryScore
 getScoreForMode mode =
     case mode of
         Hard ->
@@ -91,8 +91,8 @@ characterListElementDecoder : D.Decoder CharacterScore
 characterListElementDecoder =
     D.map3 CharacterScore
         (D.field "character" D.string)
-        (D.maybe <| D.field "normal" scoreDataDecoder)
-        (D.maybe <| D.field "hard" scoreDataDecoder)
+        (D.maybe <| D.field "normal" summaryScoreDecoder)
+        (D.maybe <| D.field "hard" summaryScoreDecoder)
 
 
 type alias CharacterList =
@@ -117,19 +117,45 @@ armamentDecoder =
         (D.field "level" <| nvlDecoder 0 D.int)
 
 
-type alias ScoreData =
+type alias SummaryScore =
     { playCount : Int
     , highScore : Int
     , averageScore : Float
     }
 
 
-scoreDataDecoder : D.Decoder ScoreData
-scoreDataDecoder =
-    D.map3 ScoreData
+emptySummaryScore =
+    { playCount = 0
+    , highScore = 0
+    , averageScore = 0
+    }
+
+
+summaryScoreDecoder : D.Decoder SummaryScore
+summaryScoreDecoder =
+    D.map3 SummaryScore
         (D.field "playCount" D.int)
         (D.field "highScore" D.int)
         (D.field "averageScore" D.float)
+
+
+type alias ModeSummaryScore =
+    { hard : Maybe SummaryScore
+    , normal : Maybe SummaryScore
+    }
+
+
+emptyModeSummaryScore =
+    { hard = emptySummaryScore
+    , normal = emptySummaryScore
+    }
+
+
+modeSummaryScoreDecoder : D.Decoder ModeSummaryScore
+modeSummaryScoreDecoder =
+    D.map2 ModeSummaryScore
+        (D.maybe <| D.field "hard" summaryScoreDecoder)
+        (D.maybe <| D.field "normal" summaryScoreDecoder)
 
 
 type alias PlayResult =
@@ -155,70 +181,63 @@ playResultDecoder =
         (D.field "missSituation" D.string)
 
 
-type alias CharacterSummaryElement =
-    { scoreSummary : ScoreData
-    , scoreRanking : List PlayResult
-    }
-
-
-characterSummaryElementDecoder : D.Decoder CharacterSummaryElement
-characterSummaryElementDecoder =
-    D.map2 CharacterSummaryElement
-        (D.field "scoreSummary" scoreDataDecoder)
-        (D.field "scoreRanking" <| D.list playResultDecoder)
-
-
-type alias PlayResults =
+type alias ModePlayResults =
     { hard : List PlayResult
     , normal : List PlayResult
     }
 
 
-flattenPlayResults : PlayResults -> List PlayResult
+emptyModePlayResults =
+    { hard = [], normal = [] }
+
+
+flattenPlayResults : ModePlayResults -> List PlayResult
 flattenPlayResults prs =
     prs.hard ++ prs.normal |> List.sortWith (\r0 r1 -> compare (Time.posixToMillis r1.playTime) (Time.posixToMillis r0.playTime))
 
 
-playResultsDecoder : D.Decoder PlayResults
-playResultsDecoder =
-    D.map2 PlayResults
+modePlayResultsDecoder : D.Decoder ModePlayResults
+modePlayResultsDecoder =
+    D.map2 ModePlayResults
         (D.field "hard" <| D.list playResultDecoder)
         (D.field "normal" <| D.list playResultDecoder)
 
 
-type alias CharacterSummary =
+type alias CharacterResult =
     { character : CharacterName
-    , hard : Maybe CharacterSummaryElement
-    , normal : Maybe CharacterSummaryElement
+    , summary : ModeSummaryScore
+    , ranking : ModePlayResults
+    , detail : ModePlayResults
     }
 
 
-emptyCharacterSummary =
-    { character = "", normal = Nothing, hard = Nothing }
+emptyCharacterResult =
+    { character = "", summary = emptyModeSummaryScore, ranking = emptyModePlayResults, detail = emptyModePlayResults }
 
 
-characterSummaryDecoder : D.Decoder CharacterSummary
-characterSummaryDecoder =
-    D.map3 CharacterSummary
+characterResultDecoder : D.Decoder CharacterResult
+characterResultDecoder =
+    D.map4 CharacterResult
         (D.field "character" D.string)
-        (D.maybe <| D.field "hard" characterSummaryElementDecoder)
-        (D.maybe <| D.field "normal" characterSummaryElementDecoder)
+        (D.field "summary" modeSummaryScoreDecoder)
+        (D.field "ranking" modePlayResultsDecoder)
+        (D.field "detail" modePlayResultsDecoder)
 
 
-type alias TotalPlayState =
-    { hard : ScoreData
-    , normal : ScoreData
+type alias TotalResult =
+    { hard : SummaryScore
+    , normal : SummaryScore
     }
 
 
-totalPlayStateDecoder : D.Decoder TotalPlayState
-totalPlayStateDecoder =
-    D.map2 TotalPlayState
-        (D.field "hard" scoreDataDecoder)
-        (D.field "normal" scoreDataDecoder)
+totalResultDecoder : D.Decoder TotalResult
+totalResultDecoder =
+    D.map2 TotalResult
+        (D.field "hard" summaryScoreDecoder)
+        (D.field "normal" summaryScoreDecoder)
 
 
-type alias DailyScoreData =
+type alias DailyScore =
     { playCount : Int
     , highScore : Int
     , averageScore : Float
@@ -226,39 +245,39 @@ type alias DailyScoreData =
     }
 
 
-dailyScoreDataDecoder : D.Decoder DailyScoreData
-dailyScoreDataDecoder =
-    D.map4 DailyScoreData
+dailyScoreDecoder : D.Decoder DailyScore
+dailyScoreDecoder =
+    D.map4 DailyScore
         (D.field "playCount" D.int)
         (D.field "highScore" D.int)
         (D.field "averageScore" D.float)
         (D.field "playDate" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime <| s ++ "T00:00:00.000Z"))
 
 
-type alias DailyScoreDatas =
-    { hard : List DailyScoreData
-    , normal : List DailyScoreData
+type alias ModeDailyScores =
+    { hard : List DailyScore
+    , normal : List DailyScore
     }
 
 
-dailyScoreDatasDecoder : D.Decoder DailyScoreDatas
-dailyScoreDatasDecoder =
-    D.map2 DailyScoreDatas
-        (D.field "hard" <| D.list dailyScoreDataDecoder)
-        (D.field "normal" <| D.list dailyScoreDataDecoder)
+modeDailyScoresDecoder : D.Decoder ModeDailyScores
+modeDailyScoresDecoder =
+    D.map2 ModeDailyScores
+        (D.field "hard" <| D.list dailyScoreDecoder)
+        (D.field "normal" <| D.list dailyScoreDecoder)
 
 
-type alias DailyPlayResult =
-    { summary : DailyScoreDatas
-    , detail : PlayResults
+type alias DailyResult =
+    { summary : ModeDailyScores
+    , detail : ModePlayResults
     }
 
 
-dailyPlayResultDecoder : D.Decoder DailyPlayResult
-dailyPlayResultDecoder =
-    D.map2 DailyPlayResult
-        (D.field "summary" dailyScoreDatasDecoder)
-        (D.field "detail" playResultsDecoder)
+dailyResultDecoder : D.Decoder DailyResult
+dailyResultDecoder =
+    D.map2 DailyResult
+        (D.field "summary" modeDailyScoresDecoder)
+        (D.field "detail" modePlayResultsDecoder)
 
 
 nvlDecoder : a -> D.Decoder a -> D.Decoder a

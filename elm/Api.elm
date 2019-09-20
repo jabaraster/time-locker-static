@@ -13,33 +13,33 @@ getCharacterList operation =
         }
 
 
-getCharacterSummary : CharacterName -> (Result Http.Error CharacterSummary -> msg) -> Cmd msg
-getCharacterSummary name operation =
+getCharacterResult : CharacterName -> (Result Http.Error CharacterResult -> msg) -> Cmd msg
+getCharacterResult name operation =
     Http.get
         { url = "/api/character/" ++ name
-        , expect = Http.expectJson operation characterSummaryDecoder
+        , expect = Http.expectJson operation characterResultDecoder
         }
 
 
-getTotalPlayState : (Result Http.Error TotalPlayState -> msg) -> Cmd msg
-getTotalPlayState operation =
+getTotalResult : (Result Http.Error TotalResult -> msg) -> Cmd msg
+getTotalResult operation =
     Http.get
-        { url = "/api/total-play-state/"
-        , expect = Http.expectJson operation totalPlayStateDecoder
+        { url = "/api/total-result/"
+        , expect = Http.expectJson operation totalResultDecoder
         }
 
 
-getScoreRanking : (Result Http.Error PlayResults -> msg) -> Cmd msg
+getScoreRanking : (Result Http.Error ModePlayResults -> msg) -> Cmd msg
 getScoreRanking operation =
     Http.get
         { url = "/api/score-ranking/"
-        , expect = Http.expectJson operation playResultsDecoder
+        , expect = Http.expectJson operation modePlayResultsDecoder
         }
 
 
-getDailyPlayResult : (Result Http.Error DailyPlayResult -> msg) -> Cmd msg
-getDailyPlayResult operation =
+getDailyResult : (Result Http.Error DailyResult -> msg) -> Cmd msg
+getDailyResult operation =
     Http.get
-        { url = "/api/daily-play-result/"
-        , expect = Http.expectJson operation dailyPlayResultDecoder
+        { url = "/api/daily-result/"
+        , expect = Http.expectJson operation dailyResultDecoder
         }
