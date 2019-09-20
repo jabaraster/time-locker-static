@@ -139,18 +139,20 @@ type alias PlayResult =
     , armaments : List Armament
     , reasons : List String
     , playTime : Time.Posix
+    , missSituation : String
     }
 
 
 playResultDecoder : D.Decoder PlayResult
 playResultDecoder =
-    D.map6 PlayResult
+    D.map7 PlayResult
         (D.field "character" D.string)
         (D.field "mode" gameModeDecoder)
         (D.field "score" <| nvlDecoder 0 D.int)
         (D.field "armaments" <| D.list armamentDecoder)
         (D.field "reasons" <| D.list D.string)
         (D.field "created" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime s))
+        (D.field "missSituation" D.string)
 
 
 type alias CharacterSummaryElement =
@@ -170,6 +172,11 @@ type alias PlayResults =
     { hard : List PlayResult
     , normal : List PlayResult
     }
+
+
+flattenPlayResults : PlayResults -> List PlayResult
+flattenPlayResults prs =
+    prs.hard ++ prs.normal |> List.sortWith (\r0 r1 -> compare (Time.posixToMillis r1.playTime) (Time.posixToMillis r0.playTime))
 
 
 playResultsDecoder : D.Decoder PlayResults

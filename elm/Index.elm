@@ -520,12 +520,8 @@ viewDailyPlayResultPageCore model =
             [ span [] [ text "Fail loading..." ] ]
 
         Just (Ok res) ->
-            [ h3 [] [ text "Detail" ]
-            ]
-                ++ [ h4 [] [ text "Hard" ] ]
-                ++ (List.map (viewPlayResultWithCharacterImage model.zone) <| List.take 20 res.detail.hard)
-                ++ [ h4 [] [ text "Normal" ] ]
-                ++ (List.map (viewPlayResultWithCharacterImage model.zone) <| List.take 20 res.detail.normal)
+            h3 [] [ text "Detail" ]
+                :: (List.map (viewPlayResultWithCharacterImage model.zone True) <| flattenPlayResults res.detail)
 
 
 viewCharacterSummaryPage : Model -> CharacterName -> Maybe (RemoteResource CharacterSummary) -> Document Msg
@@ -603,8 +599,8 @@ viewPlayResult zone result =
     div [ class "score-rank-container" ] <| viewPlayResultCore zone result
 
 
-viewPlayResultWithCharacterImage : Time.Zone -> PlayResult -> Html Msg
-viewPlayResultWithCharacterImage zone result =
+viewPlayResultWithCharacterImage : Time.Zone -> Bool -> PlayResult -> Html Msg
+viewPlayResultWithCharacterImage zone showMissSituation result =
     div [ class "score-rank-container" ] <|
         a [ href <| "/character/" ++ result.character ]
             [ div [ class "character-image-container" ]
@@ -613,13 +609,35 @@ viewPlayResultWithCharacterImage zone result =
                 ]
             ]
             :: viewPlayResultCore zone result
+            ++ (toListH <| viewMissSituation showMissSituation result)
+
+
+viewMissSituation : Bool -> PlayResult -> Maybe (Html Msg)
+viewMissSituation showMissSituation result =
+    if showMissSituation then
+        Just <|
+            div [ class "miss-situation" ]
+                [ div []
+                    [ span [ class "miss-situation-label" ] [ text "Miss situation" ]
+                    , span [ class "miss-situation" ] [ text result.missSituation ]
+                    ]
+                , div []
+                    [ span [ class "miss-situation-label" ] [ text "and reason(s)" ]
+                    , span [ class "miss-situation" ] [ text <| String.join ", " result.reasons ]
+                    ]
+                ]
+
+    else
+        Nothing
 
 
 viewPlayResultCore : Time.Zone -> PlayResult -> List (Html Msg)
 viewPlayResultCore zone result =
-    [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
-    , span [ class <| "score " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text <| formatComma result.score ]
-    , span [ class "play-time" ] [ text <| Times.omitSecond result.playTime zone ]
+    [ div []
+        [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
+        , span [ class <| "score " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text <| formatComma result.score ]
+        , span [ class "play-time" ] [ text <| Times.omitSecond result.playTime zone ]
+        ]
     , div [ class "armaments-container" ] <| List.map viewArmament result.armaments
     ]
 
@@ -765,10 +783,10 @@ viewScoreRanking zone rr =
             [ fixParts
             , div [ class "score-ranking-container" ] <|
                 h3 [] [ text "Hard" ]
-                    :: (List.map (viewPlayResultWithCharacterImage zone) <| List.take 10 scoreRanking.hard)
+                    :: (List.map (viewPlayResultWithCharacterImage zone False) <| List.take 10 scoreRanking.hard)
             , div [ class "score-ranking-container" ] <|
                 h3 [] [ text "Normal" ]
-                    :: (List.map (viewPlayResultWithCharacterImage zone) <| List.take 10 scoreRanking.normal)
+                    :: (List.map (viewPlayResultWithCharacterImage zone False) <| List.take 10 scoreRanking.normal)
             ]
 
 
@@ -945,6 +963,11 @@ turnOverOrder order src =
 
         ( Descendant, LT ) ->
             GT
+
+
+toListH : Maybe (Html msg) -> List (Html msg)
+toListH =
+    Maybe.withDefault [] << Maybe.map (\e -> [ e ])
 
 
 characterNames =
