@@ -1,8 +1,9 @@
-module Index exposing (Model, Msg(..), Page(..), PageForParser(..), characterImageUrl, characterNames, characterSummaryReloader, checkbox, checkboxMode, checkboxOrder, checkboxProperty, convPage, enumParser, formatComma, gameModeToSortQueryString, getTimeZone, init, isLoading, loadingIcon, main, parseUrl, reloadButton, sortCharacters, sortCore, sortOrderToQueryString, sortPropertyToQueryString, sortStateQueryParser, sortStateToQueryString, subscriptions, tagHighScore, tagScore, toListH, turnOverOrder, update, view, viewArmament, viewCharacterList, viewCharacterPage, viewCharacterResultCore, viewCharacterScoreRanking, viewDailyPlayResultPage, viewDailyPlayResultPageCore, viewDailySummary, viewDashboardPage, viewHeader, viewMissSituation, viewNotFoundPage, viewPlayResult, viewPlayResultCore, viewPlayResultWithCharacterImage, viewScoreRanking, viewScoreRankingPage, viewScoreSummary, viewScoreSummaryCore, viewTotalResult)
+module Index exposing (Model, Msg(..), Page(..), PageForParser(..), characterImageUrl, characterNames, characterSummaryReloader, checkbox, checkboxMode, checkboxOrder, checkboxProperty, convPage, enumParser, formatComma, gameModeToSortQueryString, getTimeZone, init, isLoading, loadingIcon, main, parseUrl, reloadButton, sortCharacters, sortCore, sortOrderToQueryString, sortPropertyToQueryString, sortStateQueryParser, sortStateToQueryString, subscriptions, tagHighScore, tagScore, toListH, turnOverOrder, update, view, viewArmament, viewCharacterList, viewCharacterPage, viewCharacterResultCore, viewCharacterScoreRanking, viewDailyPlayResultPage, viewDailyPlayResultPageCore, viewDashboardPage, viewHeader, viewMissSituation, viewNotFoundPage, viewPlayResult, viewPlayResultCore, viewPlayResultWithCharacterImage, viewScoreRanking, viewScoreRankingPage, viewScoreSummary, viewScoreSummaryCore, viewTotalResult)
 
 import Api
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Nav exposing (Key)
+import Date exposing (Date)
 import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -523,25 +524,12 @@ viewDailyPlayResultPageCore model =
             List.concat <|
                 List.map
                     (\results ->
-                        [ viewScoreSummaryCore (Just { zone = model.zone, time = results.day }) results.summary ]
+                        [ viewScoreSummaryCore (Just results.day) results.summary ]
                             ++ List.map (viewPlayResultWithCharacterImage model.zone True) results.detail
                             ++ [ hr [] [] ]
                     )
                 <|
                     Types.convertDailyResultWork model.zone res
-
-
-viewDailySummary : Zone -> ( List Posix, Dict Int ModeSummaryScore ) -> List (Html Msg)
-viewDailySummary zone ( dates, summaries ) =
-    List.map
-        (\day ->
-            let
-                t =
-                    { zone = zone, time = day }
-            in
-            viewScoreSummaryCore (Just t) <| Maybe.withDefault emptyModeSummaryScore <| Dict.get (Time.posixToMillis day) summaries
-        )
-        dates
 
 
 viewCharacterPage : Model -> CharacterName -> Maybe (RemoteResource CharacterResult) -> Document Msg
@@ -667,8 +655,8 @@ viewArmament arm =
         ]
 
 
-viewScoreSummaryCore : Maybe ZonedTime -> ModeSummaryScore -> Html Msg
-viewScoreSummaryCore mTime summary =
+viewScoreSummaryCore : Maybe Date -> ModeSummaryScore -> Html Msg
+viewScoreSummaryCore mDate summary =
     let
         mHardScore =
             summary.hard
@@ -688,7 +676,7 @@ viewScoreSummaryCore mTime summary =
     table [ class "score-table score-summary-container" ]
         [ thead []
             [ tr []
-                [ th [] <| Maybe.withDefault [] <| Maybe.map (\time -> [ h3 [] [ text <| Times.omitHour2 time ] ]) mTime
+                [ th [] <| Maybe.withDefault [] <| Maybe.map (\date -> [ h3 [] [ text <| Times.dateString date ] ]) mDate
                 , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
                 , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
                 ]

@@ -16,6 +16,7 @@
             "elm-community/list-extra": "8.2.2",
             "elm-community/list-split": "1.0.3",
             "elm-community/maybe-extra": "5.0.0",
+            "justinmimbs/date": "3.2.0",
             "justinmimbs/time-extra": "1.1.0",
             "ringvold/elm-iso8601-date-strings": "1.0.2",
             "ryannhg/date-format": "2.3.0"
@@ -24,8 +25,7 @@
             "elm/bytes": "1.0.8",
             "elm/file": "1.0.5",
             "elm/parser": "1.1.0",
-            "elm/virtual-dom": "1.0.2",
-            "justinmimbs/date": "3.2.0"
+            "elm/virtual-dom": "1.0.2"
         }
     },
     "test-dependencies": {
