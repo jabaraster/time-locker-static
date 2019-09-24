@@ -80,7 +80,7 @@ type alias Model =
     , totalResult : RemoteResource TotalResult
     , scoreRanking : RemoteResource ModePlayResults
     , characterResultList : Dict CharacterName (RemoteResource CharacterResult)
-    , dailyResult : RemoteResource DailyResult
+    , dailyResult : RemoteResource DailyResultWork
     }
 
 
@@ -97,7 +97,7 @@ type Msg
     | LoadScoreRanking
     | CharacterResultLoaded CharacterName (Result Http.Error CharacterResult)
     | LoadCharacterResult CharacterName
-    | DailyResultLoaded (Result Http.Error DailyResult)
+    | DailyResultLoaded (Result Http.Error DailyResultWork)
     | LoadDailyResult
 
 
@@ -509,10 +509,10 @@ viewDailyPlayResultPage model =
 viewDailyPlayResultPageCore : Model -> List (Html Msg)
 viewDailyPlayResultPageCore model =
     let
-        dailyPlayResult =
+        dailyResult =
             model.dailyResult
     in
-    case dailyPlayResult.data of
+    case dailyResult.data of
         Nothing ->
             [ span [] [ text "Now loading..." ] ]
 
@@ -520,11 +520,15 @@ viewDailyPlayResultPageCore model =
             [ span [] [ text "Fail loading..." ] ]
 
         Just (Ok res) ->
-            []
-                ++ [ h3 [] [ text "Detail" ] ]
-                ++ (List.map (viewPlayResultWithCharacterImage model.zone True) <| flattenPlayResults res.detail)
-                ++ [ h3 [] [ text "Summary" ] ]
-                ++ viewDailySummary model.zone res.summary
+            List.concat <|
+                List.map
+                    (\results ->
+                        [ viewScoreSummaryCore (Just { zone = model.zone, time = results.day }) results.summary ]
+                            ++ List.map (viewPlayResultWithCharacterImage model.zone True) results.detail
+                            ++ [ hr [] [] ]
+                    )
+                <|
+                    Types.convertDailyResultWork model.zone res
 
 
 viewDailySummary : Zone -> ( List Posix, Dict Int ModeSummaryScore ) -> List (Html Msg)
@@ -648,7 +652,7 @@ viewPlayResultCore zone showMissSituation result =
     div []
         [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
         , span [ class <| "score " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text <| formatComma result.score ]
-        , span [ class "play-time" ] [ text <| Times.omitSecond result.playTime zone ]
+        , span [ class "play-time" ] [ text <| Times.omitSecond zone result.playTime ]
         ]
         :: (toListH <| viewMissSituation showMissSituation result)
         ++ [ div [ class "armaments-container" ] <| List.map viewArmament result.armaments
@@ -683,20 +687,18 @@ viewScoreSummaryCore mTime summary =
     in
     table [ class "score-table score-summary-container" ]
         [ thead []
-            [ tr [] <|
-                (Maybe.withDefault [] <| Maybe.map (\_ -> [ th [] [] ]) mTime)
-                    ++ [ th [] []
-                       , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
-                       , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
-                       ]
+            [ tr []
+                [ th [] <| Maybe.withDefault [] <| Maybe.map (\time -> [ h3 [] [ text <| Times.omitHour2 time ] ]) mTime
+                , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
+                , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
+                ]
             ]
         , tbody []
-            [ tr [] <|
-                (Maybe.withDefault [] <| Maybe.map (\time -> [ th [ rowspan 3 ] [ text <| Times.omitHour2 time ] ]) mTime)
-                    ++ [ th [] [ text "Play count" ]
-                       , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardScore ]
-                       , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalScore ]
-                       ]
+            [ tr []
+                [ th [] [ text "Play count" ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardScore ]
+                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalScore ]
+                ]
             , tr []
                 [ th [] [ text "High score" ]
                 , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mHardScore ]

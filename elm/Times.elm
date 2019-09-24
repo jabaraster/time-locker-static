@@ -3,6 +3,7 @@ module Times exposing (..)
 import DateFormat exposing (..)
 import Iso8601
 import Time exposing (Posix, Zone)
+import Time.Extra as TE
 
 
 type alias ZonedTime =
@@ -16,8 +17,8 @@ parseDatetime s =
     Result.withDefault (Time.millisToPosix 0) <| Iso8601.toTime s
 
 
-omitHour : Posix -> Zone -> String
-omitHour t zone =
+omitHour : Zone -> Posix -> String
+omitHour zone t =
     DateFormat.format
         [ yearNumber
         , text "/"
@@ -31,11 +32,16 @@ omitHour t zone =
 
 omitHour2 : ZonedTime -> String
 omitHour2 t =
-    omitHour t.time t.zone
+    omitHour t.zone t.time
 
 
-omitSecond : Posix -> Zone -> String
-omitSecond t zone =
+toHourOmittedTime : ZonedTime -> Posix
+toHourOmittedTime t =
+    TE.floor TE.Day t.zone t.time
+
+
+omitSecond : Zone -> Posix -> String
+omitSecond zone t =
     DateFormat.format
         [ yearNumber
         , text "/"

@@ -2,6 +2,7 @@ module Api exposing (..)
 
 import Http
 import Json.Decode as D
+import Time exposing (Zone)
 import Types exposing (..)
 
 
@@ -37,9 +38,9 @@ getScoreRanking operation =
         }
 
 
-getDailyResult : (Result Http.Error DailyResult -> msg) -> Cmd msg
+getDailyResult : (Result Http.Error DailyResultWork -> msg) -> Cmd msg
 getDailyResult operation =
     Http.get
         { url = "/api/daily-result/"
-        , expect = Http.expectJson operation dailyResultDecoder
+        , expect = Http.expectJson operation dailyResultWorkDecoder
         }
