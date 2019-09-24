@@ -1,5 +1,6 @@
-module Types exposing (..)
+module Types exposing (Armament, CharacterList, CharacterName, CharacterResult, CharacterScore, DailyResult, DailyResultList, DailyResultWork, DailySummaryScore, GameMode(..), ModeDailyScores, ModePlayResults, ModeSummaryScore, PlayResult, SortOrder(..), SortProperty(..), SortState, SummaryScore, TotalResult, armamentDecoder, characterListDecoder, characterListElementDecoder, characterResultDecoder, convertDailyResultWork, dailyResultWorkDecoder, dailySummaryScoreDecoder, dailySummaryToSummary, emptyCharacterResult, emptyCharacterScore, emptyModePlayResults, emptyModeSummaryScore, emptySummaryScore, fillDates, flatten, gameModeDecoder, gameModeToString, getScoreForMode, initialSortState, modeDailyScoresDecoder, modePlayResultsDecoder, modeSummaryScoreDecoder, nvlDecoder, playResultDecoder, summaryScoreDecoder, totalResultDecoder)
 
+import Date exposing (Date)
 import Dict exposing (Dict)
 import Json.Decode as D
 import Maybe.Extra as ME
@@ -144,7 +145,7 @@ type alias DailySummaryScore =
     { playCount : Int
     , highScore : Int
     , averageScore : Float
-    , playDate : Posix
+    , playDate : Date
     }
 
 
@@ -154,7 +155,17 @@ dailySummaryScoreDecoder =
         (D.field "playCount" D.int)
         (D.field "highScore" D.int)
         (D.field "averageScore" D.float)
-        (D.field "playDate" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime <| s ++ "T00:00:00+09:00"))
+        (D.field "playDate" D.string |> D.andThen (D.succeed << Result.withDefault defaultDate << Date.fromIsoString))
+
+
+defaultPosix : Posix
+defaultPosix =
+    Time.millisToPosix 0
+
+
+defaultDate : Date
+defaultDate =
+    Date.fromPosix Time.utc defaultPosix
 
 
 type alias ModeSummaryScore =
@@ -264,7 +275,7 @@ modeDailyScoresDecoder =
 
 
 type alias DailyResult =
-    { day : Posix
+    { day : Date
     , summary : ModeSummaryScore
     , detail : List PlayResult
     }
@@ -278,7 +289,7 @@ convertDailyResultWork : Zone -> DailyResultWork -> DailyResultList
 convertDailyResultWork zone work =
     let
         milliList =
-            List.map Time.posixToMillis <| List.map .playDate <| work.summary.normal ++ work.summary.hard
+            List.map Date.toRataDie <| List.map .playDate <| work.summary.normal ++ work.summary.hard
     in
     case ( List.minimum milliList, List.maximum milliList ) of
         ( Nothing, _ ) ->
@@ -290,13 +301,13 @@ convertDailyResultWork zone work =
         ( Just minMilli, Just maxMilli ) ->
             let
                 dates =
-                    fillDates (Time.millisToPosix maxMilli) [] (Time.millisToPosix minMilli)
+                    fillDates (Date.fromRataDie maxMilli) [] (Date.fromRataDie minMilli)
 
                 summariesHard =
-                    Dict.fromList <| List.map (\s -> ( Time.posixToMillis s.playDate, dailySummaryToSummary s )) work.summary.hard
+                    Dict.fromList <| List.map (\s -> ( Date.toRataDie s.playDate, dailySummaryToSummary s )) work.summary.hard
 
                 summariesNormal =
-                    Dict.fromList <| List.map (\s -> ( Time.posixToMillis s.playDate, dailySummaryToSummary s )) work.summary.normal
+                    Dict.fromList <| List.map (\s -> ( Date.toRataDie s.playDate, dailySummaryToSummary s )) work.summary.normal
 
                 details =
                     flatten zone work.detail
@@ -305,7 +316,7 @@ convertDailyResultWork zone work =
                 (\day ->
                     let
                         key =
-                            Time.posixToMillis day
+                            Date.toRataDie day
                     in
                     case ( Dict.get key summariesHard, Dict.get key summariesNormal, Dict.get key details ) of
                         ( Nothing, Nothing, Nothing ) ->
@@ -362,7 +373,7 @@ flatten zone results =
         (\result accumlator ->
             let
                 key =
-                    Time.posixToMillis <| Times.toHourOmittedTime { zone = zone, time = result.playTime }
+                    Date.toRataDie <| Date.fromPosix zone result.playTime
             in
             if Dict.member key accumlator then
                 Dict.update key (Maybe.map (\rs -> [ result ] ++ rs)) accumlator
@@ -389,20 +400,20 @@ dailyResultWorkDecoder =
         (D.field "detail" modePlayResultsDecoder)
 
 
-fillDates : Posix -> List Posix -> Posix -> List Posix
+fillDates : Date -> List Date -> Date -> List Date
 fillDates max accumlator current =
     let
         maxMillis =
-            Time.posixToMillis max
+            Date.toRataDie max
 
         curMillis =
-            Time.posixToMillis current
+            Date.toRataDie current
     in
     if maxMillis == curMillis then
         current :: accumlator
 
     else
-        fillDates max (current :: accumlator) (Time.millisToPosix <| curMillis + (1000 * 60 * 60 * 24))
+        fillDates max (current :: accumlator) (Date.add Date.Days 1 current)
 
 
 dailySummaryToSummary : DailySummaryScore -> SummaryScore
