@@ -1,8 +1,9 @@
 module Types exposing (..)
 
+import Dict exposing (Dict)
 import Json.Decode as D
 import Maybe.Extra as ME
-import Time
+import Time exposing (Posix)
 import Times
 
 
@@ -139,6 +140,23 @@ summaryScoreDecoder =
         (D.field "averageScore" D.float)
 
 
+type alias DailySummaryScore =
+    { playCount : Int
+    , highScore : Int
+    , averageScore : Float
+    , playDate : Posix
+    }
+
+
+dailySummaryScoreDecoder : D.Decoder DailySummaryScore
+dailySummaryScoreDecoder =
+    D.map4 DailySummaryScore
+        (D.field "playCount" D.int)
+        (D.field "highScore" D.int)
+        (D.field "averageScore" D.float)
+        (D.field "playDate" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime <| s ++ "T00:00:00.000Z"))
+
+
 type alias ModeSummaryScore =
     { hard : Maybe SummaryScore
     , normal : Maybe SummaryScore
@@ -146,8 +164,8 @@ type alias ModeSummaryScore =
 
 
 emptyModeSummaryScore =
-    { hard = emptySummaryScore
-    , normal = emptySummaryScore
+    { hard = Nothing
+    , normal = Nothing
     }
 
 
@@ -164,7 +182,7 @@ type alias PlayResult =
     , score : Int
     , armaments : List Armament
     , reasons : List String
-    , playTime : Time.Posix
+    , playTime : Posix
     , missSituation : String
     }
 
@@ -237,38 +255,21 @@ totalResultDecoder =
         (D.field "normal" summaryScoreDecoder)
 
 
-type alias DailyScore =
-    { playCount : Int
-    , highScore : Int
-    , averageScore : Float
-    , playDate : Time.Posix
-    }
-
-
-dailyScoreDecoder : D.Decoder DailyScore
-dailyScoreDecoder =
-    D.map4 DailyScore
-        (D.field "playCount" D.int)
-        (D.field "highScore" D.int)
-        (D.field "averageScore" D.float)
-        (D.field "playDate" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime <| s ++ "T00:00:00.000Z"))
-
-
 type alias ModeDailyScores =
-    { hard : List DailyScore
-    , normal : List DailyScore
+    { hard : List DailySummaryScore
+    , normal : List DailySummaryScore
     }
 
 
 modeDailyScoresDecoder : D.Decoder ModeDailyScores
 modeDailyScoresDecoder =
     D.map2 ModeDailyScores
-        (D.field "hard" <| D.list dailyScoreDecoder)
-        (D.field "normal" <| D.list dailyScoreDecoder)
+        (D.field "hard" <| D.list dailySummaryScoreDecoder)
+        (D.field "normal" <| D.list dailySummaryScoreDecoder)
 
 
 type alias DailyResult =
-    { summary : ModeDailyScores
+    { summary : ( List Posix, Dict Int ModeSummaryScore )
     , detail : ModePlayResults
     }
 
@@ -276,8 +277,78 @@ type alias DailyResult =
 dailyResultDecoder : D.Decoder DailyResult
 dailyResultDecoder =
     D.map2 DailyResult
-        (D.field "summary" modeDailyScoresDecoder)
+        (D.field "summary" modeDailyScoresDecoder |> D.andThen (D.succeed << modeDailySummaryToDailySummary))
         (D.field "detail" modePlayResultsDecoder)
+
+
+modeDailySummaryToDailySummary : ModeDailyScores -> ( List Posix, Dict Int ModeSummaryScore )
+modeDailySummaryToDailySummary src =
+    let
+        milliList =
+            List.map Time.posixToMillis <| List.map .playDate <| src.hard ++ src.normal
+    in
+    case ( List.minimum milliList, List.maximum milliList ) of
+        ( Nothing, _ ) ->
+            ( [], Dict.empty )
+
+        ( _, Nothing ) ->
+            ( [], Dict.empty )
+
+        ( Just minMilli, Just maxMilli ) ->
+            ( fillDates (Time.millisToPosix maxMilli) [] (Time.millisToPosix minMilli)
+            , dailyToMode src
+            )
+
+
+dailyToMode : ModeDailyScores -> Dict Int ModeSummaryScore
+dailyToMode scores =
+    Dict.merge
+        (\k v -> Dict.insert k v)
+        (\k h n -> Dict.update k (\_ -> Just { hard = h.hard, normal = n.normal }))
+        (\k v -> Dict.insert k v)
+        (Dict.fromList <| List.map (\score -> ( Time.posixToMillis score.playDate, dailySummaryScoreToModeSummaryScore Hard score )) scores.hard)
+        (Dict.fromList <| List.map (\score -> ( Time.posixToMillis score.playDate, dailySummaryScoreToModeSummaryScore Normal score )) scores.normal)
+        Dict.empty
+
+
+fillDates : Posix -> List Posix -> Posix -> List Posix
+fillDates max accumlator current =
+    let
+        maxMillis =
+            Time.posixToMillis max
+
+        curMillis =
+            Time.posixToMillis current
+    in
+    if maxMillis == curMillis then
+        accumlator
+
+    else
+        fillDates max (current :: accumlator) (Time.millisToPosix <| curMillis + (1000 * 60 * 60 * 24))
+
+
+dailySummaryScoreToModeSummaryScore : GameMode -> DailySummaryScore -> ModeSummaryScore
+dailySummaryScoreToModeSummaryScore mode src =
+    case mode of
+        Hard ->
+            { normal = Nothing
+            , hard =
+                Just
+                    { highScore = src.highScore
+                    , averageScore = src.averageScore
+                    , playCount = src.playCount
+                    }
+            }
+
+        Normal ->
+            { hard = Nothing
+            , normal =
+                Just
+                    { highScore = src.highScore
+                    , averageScore = src.averageScore
+                    , playCount = src.playCount
+                    }
+            }
 
 
 nvlDecoder : a -> D.Decoder a -> D.Decoder a
