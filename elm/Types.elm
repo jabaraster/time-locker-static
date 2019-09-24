@@ -3,7 +3,7 @@ module Types exposing (..)
 import Dict exposing (Dict)
 import Json.Decode as D
 import Maybe.Extra as ME
-import Time exposing (Posix)
+import Time exposing (Posix, Zone)
 import Times
 
 
@@ -154,7 +154,7 @@ dailySummaryScoreDecoder =
         (D.field "playCount" D.int)
         (D.field "highScore" D.int)
         (D.field "averageScore" D.float)
-        (D.field "playDate" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime <| s ++ "T00:00:00.000Z"))
+        (D.field "playDate" D.string |> D.andThen (\s -> D.succeed <| Times.parseDatetime <| s ++ "T00:00:00+09:00"))
 
 
 type alias ModeSummaryScore =
@@ -207,11 +207,6 @@ type alias ModePlayResults =
 
 emptyModePlayResults =
     { hard = [], normal = [] }
-
-
-flattenPlayResults : ModePlayResults -> List PlayResult
-flattenPlayResults prs =
-    prs.hard ++ prs.normal |> List.sortWith (\r0 r1 -> compare (Time.posixToMillis r1.playTime) (Time.posixToMillis r0.playTime))
 
 
 modePlayResultsDecoder : D.Decoder ModePlayResults
@@ -269,46 +264,129 @@ modeDailyScoresDecoder =
 
 
 type alias DailyResult =
-    { summary : ( List Posix, Dict Int ModeSummaryScore )
+    { day : Posix
+    , summary : ModeSummaryScore
+    , detail : List PlayResult
+    }
+
+
+type alias DailyResultList =
+    List DailyResult
+
+
+convertDailyResultWork : Zone -> DailyResultWork -> DailyResultList
+convertDailyResultWork zone work =
+    let
+        milliList =
+            List.map Time.posixToMillis <| List.map .playDate <| work.summary.normal ++ work.summary.hard
+    in
+    case ( List.minimum milliList, List.maximum milliList ) of
+        ( Nothing, _ ) ->
+            []
+
+        ( _, Nothing ) ->
+            []
+
+        ( Just minMilli, Just maxMilli ) ->
+            let
+                dates =
+                    fillDates (Time.millisToPosix maxMilli) [] (Time.millisToPosix minMilli)
+
+                summariesHard =
+                    Dict.fromList <| List.map (\s -> ( Time.posixToMillis s.playDate, dailySummaryToSummary s )) work.summary.hard
+
+                summariesNormal =
+                    Dict.fromList <| List.map (\s -> ( Time.posixToMillis s.playDate, dailySummaryToSummary s )) work.summary.normal
+
+                details =
+                    flatten zone work.detail
+            in
+            List.map
+                (\day ->
+                    let
+                        key =
+                            Time.posixToMillis day
+                    in
+                    case ( Dict.get key summariesHard, Dict.get key summariesNormal, Dict.get key details ) of
+                        ( Nothing, Nothing, Nothing ) ->
+                            { day = day, summary = emptyModeSummaryScore, detail = [] }
+
+                        ( Just summaryHard, Nothing, Nothing ) ->
+                            { day = day
+                            , summary = { hard = Just summaryHard, normal = Nothing }
+                            , detail = []
+                            }
+
+                        ( Nothing, Just summaryNormal, Nothing ) ->
+                            { day = day
+                            , summary = { hard = Nothing, normal = Just summaryNormal }
+                            , detail = []
+                            }
+
+                        ( Nothing, Nothing, Just detail ) ->
+                            { day = day
+                            , summary = emptyModeSummaryScore
+                            , detail = detail
+                            }
+
+                        ( Just summaryHard, Just summaryNormal, Nothing ) ->
+                            { day = day
+                            , summary = { hard = Just summaryHard, normal = Just summaryNormal }
+                            , detail = []
+                            }
+
+                        ( Just summaryHard, Nothing, Just detail ) ->
+                            { day = day
+                            , summary = { hard = Just summaryHard, normal = Nothing }
+                            , detail = detail
+                            }
+
+                        ( Nothing, Just summaryNormal, Just detail ) ->
+                            { day = day
+                            , summary = { hard = Nothing, normal = Just summaryNormal }
+                            , detail = detail
+                            }
+
+                        ( Just summaryHard, Just summaryNormal, Just detail ) ->
+                            { day = day
+                            , summary = { hard = Just summaryHard, normal = Just summaryNormal }
+                            , detail = detail
+                            }
+                )
+                dates
+
+
+flatten : Zone -> ModePlayResults -> Dict Int (List PlayResult)
+flatten zone results =
+    List.foldr
+        (\result accumlator ->
+            let
+                key =
+                    Time.posixToMillis <| Times.toHourOmittedTime { zone = zone, time = result.playTime }
+            in
+            if Dict.member key accumlator then
+                Dict.update key (Maybe.map (\rs -> [ result ] ++ rs)) accumlator
+
+            else
+                Dict.insert key [ result ] accumlator
+        )
+        Dict.empty
+    <|
+        results.hard
+            ++ results.normal
+
+
+type alias DailyResultWork =
+    { summary : ModeDailyScores
     , detail : ModePlayResults
     }
 
 
-dailyResultDecoder : D.Decoder DailyResult
-dailyResultDecoder =
-    D.map2 DailyResult
-        (D.field "summary" modeDailyScoresDecoder |> D.andThen (D.succeed << modeDailySummaryToDailySummary))
+dailyResultWorkDecoder : D.Decoder DailyResultWork
+dailyResultWorkDecoder =
+    D.map2 DailyResultWork
+        (D.field "summary" modeDailyScoresDecoder)
         (D.field "detail" modePlayResultsDecoder)
-
-
-modeDailySummaryToDailySummary : ModeDailyScores -> ( List Posix, Dict Int ModeSummaryScore )
-modeDailySummaryToDailySummary src =
-    let
-        milliList =
-            List.map Time.posixToMillis <| List.map .playDate <| src.hard ++ src.normal
-    in
-    case ( List.minimum milliList, List.maximum milliList ) of
-        ( Nothing, _ ) ->
-            ( [], Dict.empty )
-
-        ( _, Nothing ) ->
-            ( [], Dict.empty )
-
-        ( Just minMilli, Just maxMilli ) ->
-            ( fillDates (Time.millisToPosix maxMilli) [] (Time.millisToPosix minMilli)
-            , dailyToMode src
-            )
-
-
-dailyToMode : ModeDailyScores -> Dict Int ModeSummaryScore
-dailyToMode scores =
-    Dict.merge
-        (\k v -> Dict.insert k v)
-        (\k h n -> Dict.update k (\_ -> Just { hard = h.hard, normal = n.normal }))
-        (\k v -> Dict.insert k v)
-        (Dict.fromList <| List.map (\score -> ( Time.posixToMillis score.playDate, dailySummaryScoreToModeSummaryScore Hard score )) scores.hard)
-        (Dict.fromList <| List.map (\score -> ( Time.posixToMillis score.playDate, dailySummaryScoreToModeSummaryScore Normal score )) scores.normal)
-        Dict.empty
 
 
 fillDates : Posix -> List Posix -> Posix -> List Posix
@@ -321,34 +399,18 @@ fillDates max accumlator current =
             Time.posixToMillis current
     in
     if maxMillis == curMillis then
-        accumlator
+        current :: accumlator
 
     else
         fillDates max (current :: accumlator) (Time.millisToPosix <| curMillis + (1000 * 60 * 60 * 24))
 
 
-dailySummaryScoreToModeSummaryScore : GameMode -> DailySummaryScore -> ModeSummaryScore
-dailySummaryScoreToModeSummaryScore mode src =
-    case mode of
-        Hard ->
-            { normal = Nothing
-            , hard =
-                Just
-                    { highScore = src.highScore
-                    , averageScore = src.averageScore
-                    , playCount = src.playCount
-                    }
-            }
-
-        Normal ->
-            { hard = Nothing
-            , normal =
-                Just
-                    { highScore = src.highScore
-                    , averageScore = src.averageScore
-                    , playCount = src.playCount
-                    }
-            }
+dailySummaryToSummary : DailySummaryScore -> SummaryScore
+dailySummaryToSummary src =
+    { playCount = src.playCount
+    , highScore = src.highScore
+    , averageScore = src.averageScore
+    }
 
 
 nvlDecoder : a -> D.Decoder a -> D.Decoder a
