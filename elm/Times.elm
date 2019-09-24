@@ -1,4 +1,4 @@
-module Times exposing (ZonedTime, dateString, omitSecond, parseDatetime)
+module Times exposing (ZonedTime, dateString, defaultDate, omitSecond, parseDate, parseDatetime)
 
 import Date exposing (Date)
 import DateFormat exposing (..)
@@ -16,6 +16,16 @@ type alias ZonedTime =
 parseDatetime : String -> Posix
 parseDatetime s =
     Result.withDefault (Time.millisToPosix 0) <| Iso8601.toTime s
+
+
+parseDate : String -> Date
+parseDate =
+    Result.withDefault defaultDate << Date.fromIsoString
+
+
+defaultDate : Date
+defaultDate =
+    Date.fromPosix Time.utc <| Time.millisToPosix 0
 
 
 omitSecond : Zone -> Posix -> String

@@ -677,8 +677,8 @@ viewScoreSummaryCore mDate summary =
         [ thead []
             [ tr []
                 [ th [] <| Maybe.withDefault [] <| Maybe.map (\date -> [ h3 [] [ text <| Times.dateString date ] ]) mDate
-                , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
-                , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
+                , th [ class "number" ] [ h4 [] [ text "Hard" ] ]
+                , th [ class "number" ] [ h4 [] [ text "Normal" ] ]
                 ]
             ]
         , tbody []

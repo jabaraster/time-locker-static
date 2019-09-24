@@ -155,17 +155,7 @@ dailySummaryScoreDecoder =
         (D.field "playCount" D.int)
         (D.field "highScore" D.int)
         (D.field "averageScore" D.float)
-        (D.field "playDate" D.string |> D.andThen (D.succeed << Result.withDefault defaultDate << Date.fromIsoString))
-
-
-defaultPosix : Posix
-defaultPosix =
-    Time.millisToPosix 0
-
-
-defaultDate : Date
-defaultDate =
-    Date.fromPosix Time.utc defaultPosix
+        (D.field "playDate" D.string |> D.andThen (Times.parseDate >> D.succeed))
 
 
 type alias ModeSummaryScore =
