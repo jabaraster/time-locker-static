@@ -2,7 +2,7 @@ module Index exposing (..)
 
 import Api
 import Browser exposing (Document, UrlRequest)
-import Browser.Navigation as Nav
+import Browser.Navigation as Nav exposing (Key)
 import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -15,10 +15,10 @@ import Maybe.Extra as ME
 import RemoteResource as RR exposing (RemoteResource)
 import Set
 import Task
-import Time
-import Times
+import Time exposing (Posix, Zone)
+import Times exposing (ZonedTime)
 import Types exposing (..)
-import Url
+import Url exposing (Url)
 import Url.Builder
 import Url.Parser exposing (..)
 import Url.Parser.Query as Query
@@ -72,8 +72,8 @@ convPage src =
 
 
 type alias Model =
-    { key : Nav.Key
-    , zone : Time.Zone
+    { key : Key
+    , zone : Zone
     , page : Page
     , characters : RemoteResource CharacterList
     , charactersSortState : SortState
@@ -86,8 +86,8 @@ type alias Model =
 
 type Msg
     = LinkClicked Browser.UrlRequest
-    | UrlChanged Url.Url
-    | GetTimeZone Time.Zone
+    | UrlChanged Url
+    | GetTimeZone Zone
     | CharacterListLoaded (Result Http.Error CharacterList)
     | LoadCharacterList
     | CharactersSortStateChanged SortState
@@ -106,7 +106,7 @@ getTimeZone =
     Task.perform GetTimeZone Time.here
 
 
-init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init : () -> Url -> Key -> ( Model, Cmd Msg )
 init _ url key =
     let
         page =
@@ -497,10 +497,10 @@ viewDashboardPage model =
 
 viewDailyPlayResultPage : Model -> Document Msg
 viewDailyPlayResultPage model =
-    { title = "Daily play result"
+    { title = "Daily result"
     , body =
         [ div [ class "container" ] <|
-            h2 [] [ text "Daily play result", reloadButton model.dailyResult.loading LoadDailyResult ]
+            h2 [] [ text "Daily result", reloadButton model.dailyResult.loading LoadDailyResult ]
                 :: viewDailyPlayResultPageCore model
         ]
     }
@@ -520,8 +520,24 @@ viewDailyPlayResultPageCore model =
             [ span [] [ text "Fail loading..." ] ]
 
         Just (Ok res) ->
-            h3 [] [ text "Detail" ]
-                :: (List.map (viewPlayResultWithCharacterImage model.zone True) <| flattenPlayResults res.detail)
+            []
+                ++ [ h3 [] [ text "Detail" ] ]
+                ++ (List.map (viewPlayResultWithCharacterImage model.zone True) <| flattenPlayResults res.detail)
+                ++ [ h3 [] [ text "Summary" ] ]
+                ++ viewDailySummary model.zone res.summary
+
+
+viewDailySummary : Zone -> ( List Posix, Dict Int ModeSummaryScore ) -> List (Html Msg)
+viewDailySummary zone ( dates, summaries ) =
+    List.map
+        (\day ->
+            let
+                t =
+                    { zone = zone, time = day }
+            in
+            viewScoreSummaryCore (Just t) <| Maybe.withDefault emptyModeSummaryScore <| Dict.get (Time.posixToMillis day) summaries
+        )
+        dates
 
 
 viewCharacterPage : Model -> CharacterName -> Maybe (RemoteResource CharacterResult) -> Document Msg
@@ -559,7 +575,7 @@ characterSummaryReloader characterName mResource =
                 [ reloadButton rr.loading <| LoadCharacterResult characterName ]
 
 
-viewCharacterResultCore : Time.Zone -> CharacterName -> RemoteResource CharacterResult -> List (Html Msg)
+viewCharacterResultCore : Zone -> CharacterName -> RemoteResource CharacterResult -> List (Html Msg)
 viewCharacterResultCore zone characterName rr =
     case rr.data of
         Nothing ->
@@ -572,14 +588,14 @@ viewCharacterResultCore zone characterName rr =
             ]
 
         Just (Ok data) ->
-            [ viewScoreSummary data
+            [ viewScoreSummary data.summary
             , h1 [] [ text "Score ranking" ]
             , viewCharacterScoreRanking zone Hard data.ranking.hard
             , viewCharacterScoreRanking zone Normal data.ranking.normal
             ]
 
 
-viewCharacterScoreRanking : Time.Zone -> GameMode -> List PlayResult -> Html Msg
+viewCharacterScoreRanking : Zone -> GameMode -> List PlayResult -> Html Msg
 viewCharacterScoreRanking zone mode rankings =
     div [ class "score-ranking-container" ] <|
         h3 [] [ text <| Types.gameModeToString mode ]
@@ -591,12 +607,12 @@ viewCharacterScoreRanking zone mode rankings =
                )
 
 
-viewPlayResult : Time.Zone -> Bool -> PlayResult -> Html Msg
+viewPlayResult : Zone -> Bool -> PlayResult -> Html Msg
 viewPlayResult zone showMissSituation result =
     div [ class "score-rank-container" ] <| viewPlayResultCore zone showMissSituation result
 
 
-viewPlayResultWithCharacterImage : Time.Zone -> Bool -> PlayResult -> Html Msg
+viewPlayResultWithCharacterImage : Zone -> Bool -> PlayResult -> Html Msg
 viewPlayResultWithCharacterImage zone showMissSituation result =
     div [ class "score-rank-container" ] <|
         a [ href <| "/character/" ++ result.character ]
@@ -627,7 +643,7 @@ viewMissSituation showMissSituation result =
         Nothing
 
 
-viewPlayResultCore : Time.Zone -> Bool -> PlayResult -> List (Html Msg)
+viewPlayResultCore : Zone -> Bool -> PlayResult -> List (Html Msg)
 viewPlayResultCore zone showMissSituation result =
     div []
         [ span [ class <| "score-label " ++ (String.toLower <| Types.gameModeToString result.mode) ] [ text "Score: " ]
@@ -647,13 +663,8 @@ viewArmament arm =
         ]
 
 
-viewScoreSummary : CharacterResult -> Html Msg
-viewScoreSummary characterResult =
-    viewScoreSummaryCore characterResult.summary
-
-
-viewScoreSummaryCore : ModeSummaryScore -> Html Msg
-viewScoreSummaryCore summary =
+viewScoreSummaryCore : Maybe ZonedTime -> ModeSummaryScore -> Html Msg
+viewScoreSummaryCore mTime summary =
     let
         mHardScore =
             summary.hard
@@ -672,18 +683,20 @@ viewScoreSummaryCore summary =
     in
     table [ class "score-table score-summary-container" ]
         [ thead []
-            [ tr []
-                [ th [] []
-                , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
-                , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
-                ]
+            [ tr [] <|
+                (Maybe.withDefault [] <| Maybe.map (\_ -> [ th [] [] ]) mTime)
+                    ++ [ th [] []
+                       , th [ class "number" ] [ h3 [] [ text "Hard" ] ]
+                       , th [ class "number" ] [ h3 [] [ text "Normal" ] ]
+                       ]
             ]
         , tbody []
-            [ tr []
-                [ th [] [ text "Play count" ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardScore ]
-                , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalScore ]
-                ]
+            [ tr [] <|
+                (Maybe.withDefault [] <| Maybe.map (\time -> [ th [ rowspan 3 ] [ text <| Times.omitHour2 time ] ]) mTime)
+                    ++ [ th [] [ text "Play count" ]
+                       , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mHardScore ]
+                       , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map playCountMapper mNormalScore ]
+                       ]
             , tr []
                 [ th [] [ text "High score" ]
                 , td [ class "number" ] [ text <| Maybe.withDefault "-" <| Maybe.map highScoreMapper mHardScore ]
@@ -696,6 +709,11 @@ viewScoreSummaryCore summary =
                 ]
             ]
         ]
+
+
+viewScoreSummary : ModeSummaryScore -> Html Msg
+viewScoreSummary =
+    viewScoreSummaryCore Nothing
 
 
 viewNotFoundPage : Model -> Document Msg
@@ -765,11 +783,11 @@ viewTotalResult rr =
 
         Just (Ok totalResult) ->
             [ fixParts
-            , viewScoreSummaryCore { hard = Just totalResult.hard, normal = Just totalResult.normal }
+            , viewScoreSummary { hard = Just totalResult.hard, normal = Just totalResult.normal }
             ]
 
 
-viewScoreRanking : Time.Zone -> RemoteResource ModePlayResults -> List (Html Msg)
+viewScoreRanking : Zone -> RemoteResource ModePlayResults -> List (Html Msg)
 viewScoreRanking zone rr =
     let
         fixParts =
