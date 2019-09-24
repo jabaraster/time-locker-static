@@ -1,4 +1,4 @@
-module Times exposing (..)
+module Times exposing (ZonedTime, omitHour, omitHour2, omitSecond, parseDatetime, toHourOmittedTime)
 
 import DateFormat exposing (..)
 import Iso8601
@@ -22,9 +22,9 @@ omitHour zone t =
     DateFormat.format
         [ yearNumber
         , text "/"
-        , monthNumber
+        , monthFixed
         , text "/"
-        , dayOfMonthNumber
+        , dayOfMonthFixed
         ]
         zone
         t
@@ -45,9 +45,9 @@ omitSecond zone t =
     DateFormat.format
         [ yearNumber
         , text "/"
-        , monthNumber
+        , monthFixed
         , text "/"
-        , dayOfMonthNumber
+        , dayOfMonthFixed
         , text " "
         , hourMilitaryFixed
         , text ":"
